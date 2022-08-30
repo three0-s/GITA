@@ -60,8 +60,9 @@ os.environ['XLA_IR_DEBUG'] = '1'
 
 FLAGS = {}
 FLAGS['num_cores'] = 8
-FLAGS['batch_size'] = 4
-model, preprocess = clip.load("ViT-B/32")
+FLAGS['batch_size'] = 2
+FLAGS['model_name'] = 'ViT-L/14'
+model, preprocess = clip.load(FLAGS['model_name'])
 WRAPPED_MODEL = xmp.MpModelWrapper(model)
 
 def run_clip(index, flags):
@@ -79,7 +80,7 @@ def run_clip(index, flags):
             cond_image_features = model.encode_image(cond_image)
 
         xm.master_print("cos similiraty:", torch.nn.CosineSimilarity()(input_image_features, cond_image_features))
-        xm.master_print('\n', data['input_fname'], '\t||\t', data['cond_fname'], '\n')
+        # xm.master_print('\n', data['input_fname'], '\t||\t', data['cond_fname'], '\n')
         if i > 10:
             break
 xmp.spawn(run_clip, args=(FLAGS,), nprocs=FLAGS['num_cores'],
