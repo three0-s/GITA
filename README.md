@@ -1,4 +1,4 @@
-<img src="./model.png" width="450px"></img>
+<img src="./model.png" width="650px"></img>
 
 ## GITA (General Image to Image Translation Architecture) - Pytorch
 
