@@ -1,19 +1,20 @@
 import torch as th
 import torch.nn as nn
 
-from ..utils.nn import timestep_embedding
+from utils.nn import timestep_embedding
 from .unet import UNetModel
 
 # @author: ga06033@yonsei.ac.kr (Yewon Lim)
 # Genral Image_to_Image Translation Architecture (GITA)
 class GITA(UNetModel):
-    def __init__(self, img_encoder, aug_level, *args, **kwargs):
+    def __init__(self, img_encoder, aug_level, encoding_dim=512, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.img_encoder = img_encoder
+        self.encoding_dim=encoding_dim
         self.device = list(img_encoder.modules())[1].weight.data.device
         self.dtype = list(img_encoder.modules())[1].weight.data.dtype
         self.aug_level = aug_level 
-        self.embed_linear_transform = nn.Linear(self.model_channels, self.model_channels*4, device=self.device, dtype=self.dtype)
+        self.embed_linear_transform = nn.Linear(self.encoding_dim, self.model_channels*4, device=self.device, dtype=self.dtype)
         # self.cache = None  # We need to cache encoding (or embedding) of condition image to reduce FLOPS.
         self.to(self.device)
         
