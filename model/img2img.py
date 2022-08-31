@@ -1,11 +1,11 @@
 import torch as th
 import torch.nn as nn
 
-from .nn import timestep_embedding
+from ..utils.nn import timestep_embedding
 from .unet import UNetModel
 
 # @author: ga06033@yonsei.ac.kr (Yewon Lim)
-# Genral Image2Image translation Architecture 
+# Genral Image_to_Image Translation Architecture (GITA)
 class GITA(UNetModel):
     def __init__(self, img_encoder, aug_level, *args, **kwargs):
         super().__init__(*args, **kwargs)
