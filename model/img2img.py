@@ -10,7 +10,10 @@ class GITA(UNetModel):
     def __init__(self, img_encoder, aug_level, encoding_dim=512, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.img_encoder = img_encoder
-        self.encoding_dim=encoding_dim
+        for param in self.img_encoder.parameters():
+            param.requires_grad = False
+
+        self.encoding_dim = encoding_dim
         self.device = list(img_encoder.modules())[1].weight.data.device
         self.dtype = list(img_encoder.modules())[1].weight.data.dtype
         self.aug_level = aug_level 
@@ -33,8 +36,7 @@ class GITA(UNetModel):
         if condi_img is not None:
             # embedding augmentation (Gaussian noise)
             condi_img += th.randn_like(condi_img, dtype=self.dtype, device=self.device) * self.aug_level
-            with th.no_grad():
-                img_embedding = self.img_encoder(condi_img)
+            img_embedding = self.img_encoder(condi_img)
                 
             img_embedding = self.embed_linear_transform(img_embedding)
             embedding += img_embedding

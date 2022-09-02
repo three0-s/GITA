@@ -50,6 +50,7 @@ def create_model(
     use_fp16,
     img_encoder,
     aug_level,
+    encoding_dim,
     **kwargs,
 ):
     if channel_mult == "":
@@ -74,6 +75,7 @@ def create_model(
     return model_cls(
         img_encoder=img_encoder,
         aug_level=aug_level,
+        encoding_dim=encoding_dim,  
         in_channels=3,
         model_channels=num_channels,
         out_channels=6,
@@ -120,6 +122,7 @@ def create_model_and_diffusion(
     use_fp16,
     img_encoder,
     aug_level,
+    encoding_dim,
     **kwargs,
 ):
     model = create_model(
@@ -137,6 +140,7 @@ def create_model_and_diffusion(
         use_fp16=use_fp16,
         img_encoder=img_encoder,
         aug_level=aug_level,
+        encoding_dim=encoding_dim,
         **kwargs,
     )
     diffusion = create_gaussian_diffusion(
