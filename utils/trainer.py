@@ -6,6 +6,7 @@ import blobfile as bf
 import torch as th
 import numpy as np
 
+from torch.utils.data import DataLoader
 import torch_xla
 import torch_xla.core.xla_model as xm
 import torch_xla.distributed.xla_multiprocessing as xmp
@@ -16,6 +17,7 @@ from torch.optim import AdamW
 from . import logger
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
+
 
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
@@ -252,8 +254,6 @@ class TrainLoop:
         ) as f:
             th.save(self.opt.state_dict(), f)
 
-       
-
 
 def parse_resume_step_from_filename(filename):
     """
@@ -300,6 +300,3 @@ def log_loss_dict(diffusion, ts, losses):
             quartile = int(4 * sub_t / diffusion.num_timesteps)
             logger.logkv_mean(f"{key}_q{quartile}", sub_loss)
 
-
-def train():
-    pass
