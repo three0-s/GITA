@@ -6,11 +6,7 @@ import blobfile as bf
 import torch as th
 import numpy as np
 
-from torch.utils.data import DataLoader
-import torch_xla
-import torch_xla.core.xla_model as xm
 import torch_xla.distributed.xla_multiprocessing as xmp
-import torch_xla.distributed.parallel_loader as pl
 
 from torch.optim import AdamW
 
@@ -43,6 +39,7 @@ class TrainLoop:
         schedule_sampler=None,
         weight_decay=0.0,
         lr_anneal_steps=0,
+        **kwargs,
     ):
         self.model = model
         self.diffusion = diffusion

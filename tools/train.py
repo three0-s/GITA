@@ -1,11 +1,12 @@
-from utils.trainer import TrainLoop
-from utils.model_creation import create_model_and_diffusion, model_and_diffusion_defaults
+from GITA.utils.trainer import TrainLoop
+from GITA.utils.model_creation import create_model_and_diffusion, model_and_diffusion_defaults
 import clip
-import torch
+
 import argparse
-from utils import logger
-from utils.scripts_util import args_to_dict, add_dict_to_argparser
+from GITA.utils import logger
+from GITA.utils.scripts_util import args_to_dict, add_dict_to_argparser
 from torch.utils.data import DataLoader
+from data.teeth_img import PairedTeethImageData
 
 import torch_xla
 import torch_xla.core.xla_model as xm
@@ -20,7 +21,7 @@ def create_argparser():
         lr=1e-4,
         weight_decay=1e-4,
         lr_anneal_steps=0,
-        batch_size=1,
+        batch_size=2,
         microbatch=-1,  # -1 disables microbatches
         ema_rate="0.9999",  # comma-separated list of EMA values
         log_interval=10,
@@ -35,22 +36,32 @@ def create_argparser():
     add_dict_to_argparser(parser, defaults)
     return parser
 
-
+def build_dataset(dataloader):
+    yield from dataloader
 
 def main():
     args = create_argparser().parse_args()
+    
     logger.configure()
     logger.log('='*8+' Creating Clip Encoder... '+'='*8)
     clip_model, preprocess = clip.load(args.clip_model_name)
     img_encoder = clip_model.visual
-    
+    logger.log('='*8+' Completed ! '+'='*8)
+    model_kwargs = args_to_dict(args, model_and_diffusion_defaults().keys())
+    model_kwargs.update(img_encoder=img_encoder, encoding_dim=img_encoder.output_dim, aug_level=0.07)
+    logger.log('='*8+' Creating diffusion model... '+'='*8)
     model, diffusion = create_model_and_diffusion(
-        **args_to_dict(args, model_and_diffusion_defaults().keys())
-    )
-    FLAGS = {}
-    FLAGS['num_cores'] = 8
-    FLAGS['batch_size'] = 2
-    FLAGS['model_name'] = 'ViT-L/14'
+        **model_kwargs)
+    logger.log('='*8+' Completed ! '+'='*8)
+    model_kwargs.update(num_cores=8, model=model, diffusion=diffusion, preprocess=preprocess)
+    xmp.spawn(train, args=(model_kwargs,), nprocs=model_kwargs['num_cores'])    
 
 def train(index, flags, **kwargs):
-    pass
+    device = xm.xla_device()
+    SERIAL_EXEC = xmp.MpSerialExecutor()
+    dataset = SERIAL_EXEC.run(lambda: PairedTeethImageData(flags['data_dir'], flags['preprocess']))
+    loader = DataLoader(dataset, batch_size=flags['batch_size'])
+    para_loader = pl.ParallelLoader(loader, [device]).per_device_loader(device)
+    data=build_dataset(para_loader)
+    trainer = TrainLoop(**flags, data=data)
+    trainer.run_loop()
