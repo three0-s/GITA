@@ -1,14 +1,13 @@
-from GITA.utils.trainer import TrainLoop
-from GITA.utils.model_creation import create_model_and_diffusion, model_and_diffusion_defaults
+from gita.utils.trainer import TrainLoop
+from gita.utils.model_creation import create_model_and_diffusion, model_and_diffusion_defaults
 import clip
 
 import argparse
-from GITA.utils import logger
-from GITA.utils.scripts_util import args_to_dict, add_dict_to_argparser
+from gita.utils import logger
+from gita.utils.scripts_util import args_to_dict, add_dict_to_argparser
 from torch.utils.data import DataLoader
-from data.teeth_img import PairedTeethImageData
+from gita.data.teeth_img import PairedTeethImageData
 
-import torch_xla
 import torch_xla.core.xla_model as xm
 import torch_xla.distributed.xla_multiprocessing as xmp
 import torch_xla.distributed.parallel_loader as pl

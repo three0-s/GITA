@@ -1,7 +1,7 @@
 import torch as th
 import torch.nn as nn
 
-from GITA.utils.nn import timestep_embedding
+from gita.utils.nn import timestep_embedding
 from .unet import UNetModel
 
 # @author: ga06033@yonsei.ac.kr (Yewon Lim)

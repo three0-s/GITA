@@ -1,5 +1,5 @@
 # Motivated from https://github.com/openai/glide-text2im/blob/main/glide_text2im/model_creation.py
-from model.img2img import GITA
+from gita.model.img2img import GITA
 from .gaussian_diffusion import get_named_beta_schedule
 from .respace import SpacedDiffusion, space_timesteps
 

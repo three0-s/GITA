@@ -5,8 +5,8 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from GITA.utils.fp16_util import convert_module_to_f16, convert_module_to_f32
-from GITA.utils.nn import avg_pool_nd, conv_nd, linear, normalization, timestep_embedding, zero_module
+from gita.utils.fp16_util import convert_module_to_f16, convert_module_to_f32
+from gita.utils.nn import avg_pool_nd, conv_nd, linear, normalization, timestep_embedding, zero_module
 
 
 class TimestepBlock(nn.Module):
