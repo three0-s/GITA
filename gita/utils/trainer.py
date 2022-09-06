@@ -82,7 +82,6 @@ class TrainLoop:
                 for _ in range(len(self.ema_rate))
             ]
         self.use_ddp = False
-        self.ddp_model = xmp.MpModelWrapper(self.model)
 
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -192,7 +191,7 @@ class TrainLoop:
 
             compute_losses = functools.partial(
                 self.diffusion.training_losses,
-                self.ddp_model,
+                self.model,
                 micro,
                 t,
                 model_kwargs=micro_cond,
@@ -200,9 +199,6 @@ class TrainLoop:
 
             if last_batch or not self.use_ddp:
                 losses = compute_losses()
-            else:
-                with self.ddp_model.no_sync():
-                    losses = compute_losses()
 
             if isinstance(self.schedule_sampler, LossAwareSampler):
                 self.schedule_sampler.update_with_local_losses(

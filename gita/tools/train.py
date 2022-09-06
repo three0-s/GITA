@@ -19,7 +19,7 @@ import torch_xla.distributed.parallel_loader as pl
 def create_argparser():
     defaults = dict(
         data_dir="/home/yewon/GITA/dataset/train",
-        schedule_sampler="uniform",
+        schedule_sampler=None,
         lr=1e-4,
         weight_decay=1e-4,
         lr_anneal_steps=0,

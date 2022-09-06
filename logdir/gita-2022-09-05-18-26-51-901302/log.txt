@@ -1,6 +1,0 @@
-Logging to /home/yewon/GITA/logdir/gita-2022-09-05-18-26-51-901302
-======== Creating Clip Encoder... ========
-======== Completed ! ========
-======== Creating diffusion model... ========
-======== Completed ! ========
-======== GITA Training started... ========
