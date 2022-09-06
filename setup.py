@@ -13,5 +13,6 @@ setup(
     author='Yewon Lim',
     author_email='ga06033@yonsei.ac.kr',
     long_description=long_description,
-    packages=find_packages(),
+    include_package_data=False,
+    packages=find_packages(exclude=['*dataset*', '*logdir*']),
 )

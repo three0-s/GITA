@@ -67,7 +67,7 @@ class TrainLoop:
         self._load_and_sync_parameters()
 
         self.opt = AdamW(
-            self.model.parametes(), lr=self.lr, weight_decay=self.weight_decay
+            self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay
         )
         if self.resume_step:
             self._load_optimizer_state()
@@ -78,7 +78,7 @@ class TrainLoop:
             ]
         else:
             self.ema_params = [
-                copy.deepcopy(self.model.parametes())
+                copy.deepcopy(list(self.model.parameters()))
                 for _ in range(len(self.ema_rate))
             ]
         self.use_ddp = False
@@ -103,7 +103,7 @@ class TrainLoop:
 
 
     def _load_ema_parameters(self, rate):
-        ema_params = copy.deepcopy(self.model.parametes())
+        ema_params = copy.deepcopy(list(self.model.parameters()))
 
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
         ema_checkpoint = find_ema_checkpoint(main_checkpoint, self.resume_step, rate)
@@ -166,7 +166,7 @@ class TrainLoop:
     def _compute_norms(self, grad_scale=1.0):
         grad_norm = 0.0
         param_norm = 0.0
-        for p in self.model.parametes():
+        for p in self.model.parameters():
             with th.no_grad():
                 param_norm += th.norm(p, p=2, dtype=th.float32).item() ** 2
                 if p.grad is not None:

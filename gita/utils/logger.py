@@ -443,7 +443,7 @@ def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
     If comm is provided, average all numerical stats across that comm
     """
     if dir is None:
-        dir = os.getenv("GITA_LOGDIR")
+        dir = osp.join(os.getenv("GITA_LOGDIR", '/home/yewon/GITA/logdir'), datetime.datetime.now().strftime("gita-%Y-%m-%d-%H-%M-%S-%f"))
     if dir is None:
         dir = osp.join(
             tempfile.gettempdir(),

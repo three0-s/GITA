@@ -40,6 +40,13 @@ def linear(*args, **kwargs):
     """
     return nn.Linear(*args, **kwargs)
 
+
+def mean_flat(tensor):
+    """
+    Take the mean over all non-batch dimensions.
+    """
+    return tensor.mean(dim=list(range(1, len(tensor.shape))))
+
 def avg_pool_nd(dims, *args, **kwargs):
     """
     Create a 1D, 2D, or 3D average pooling module.

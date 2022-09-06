@@ -1,0 +1,6 @@
+Logging to /home/yewon/GITA/logdir
+======== Creating Clip Encoder... ========
+======== Completed ! ========
+======== Creating diffusion model... ========
+======== Completed ! ========
+======== GITA Training started... ========

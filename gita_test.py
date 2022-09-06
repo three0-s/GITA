@@ -1,4 +1,4 @@
-from utils.model_creation import create_model, model_and_diffusion_defaults
+from gita.utils.model_creation import create_model, model_and_diffusion_defaults
 import clip
 import torch
 import numpy as np

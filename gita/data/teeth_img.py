@@ -66,10 +66,10 @@ class PairedTeethImageData(TeethImageData_GCS):
         img_id = img_path.split('/')[-1].split('.')[0]
         img = ToTensor()(Image.open(img_path))
         input_img, condi = torch.chunk(img, 2, dim=-1)
-        input_img = self.img_resizer(input_img).to(self.device)
-        condi = self.condi_resizer(condi).to(self.device)
+        input_img = self.img_resizer(input_img)
+        condi = self.condi_resizer(condi)
         
 
         # sample = {'input_image':input_img, 'img_id':img_id, 
         #           'cond_image':condi, **self.img_meta}
-        return (input_img, condi)
+        return (input_img.to(self.device), {'condi_img':condi.to(self.device)})

@@ -1,0 +1,3 @@
+prune dataset/
+prune logdir/
+prune gita.egg-info/
