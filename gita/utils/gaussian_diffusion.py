@@ -797,10 +797,13 @@ class GaussianDiffusion:
             model_kwargs = {}
         if noise is None:
             noise = th.randn_like(x_start)
+        # logger.log('q sample starts')
         x_t = self.q_sample(x_start, t, noise=noise)
-
+        x_t.to(model.device)
+        # logger.log('q sample ends')
         terms = {}
-
+        logger.log(f'x_t device: {x_t.device}, model device: {model.device}')
+            
         if self.loss_type == LossType.KL or self.loss_type == LossType.RESCALED_KL:
             terms["loss"] = self._vb_terms_bpd(
                 model=model,
@@ -813,8 +816,11 @@ class GaussianDiffusion:
             if self.loss_type == LossType.RESCALED_KL:
                 terms["loss"] *= self.num_timesteps
         elif self.loss_type == LossType.MSE or self.loss_type == LossType.RESCALED_MSE:
+            # logger.log('model forwarding')
             model_output = model(x_t, self._scale_timesteps(t), **model_kwargs)
-
+            # logger.log('model forward completed')
+            # logger.log(f'model var type: {self.model_var_type}')
+            
             if self.model_var_type in [
                 ModelVarType.LEARNED,
                 ModelVarType.LEARNED_RANGE,
@@ -849,6 +855,7 @@ class GaussianDiffusion:
                 logger.log(f'model output.shape = {model_output.shape}\n\
                   target.shape = {target.shape}\n\
                   x_start.shape = {x_start.shape}\n')
+            # logger.log(f'model output.shape = {model_output.shape}\ntarget.shape = {target.shape}\nx_start.shape = {x_start.shape}\n')
             terms["mse"] = mean_flat((target - model_output) ** 2)
             if "vb" in terms:
                 terms["loss"] = terms["mse"] + terms["vb"]
@@ -856,7 +863,7 @@ class GaussianDiffusion:
                 terms["loss"] = terms["mse"]
         else:
             raise NotImplementedError(self.loss_type)
-
+        # logger.log(str(terms))
         return terms
 
     def _prior_bpd(self, x_start):

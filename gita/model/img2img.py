@@ -19,11 +19,17 @@ class GITA(UNetModel):
         self.aug_level = aug_level 
         self.embed_linear_transform = nn.Linear(self.encoding_dim, self.model_channels*4, device=self.device, dtype=self.dtype)
         # self.cache = None  # We need to cache encoding (or embedding) of condition image to reduce FLOPS.
+        self.img_encoder.to(self.device)
         self.to(self.device)
         
     # # Motivated by GLIDE (https://github.com/openai/glide-text2im/blob/69b530740eb6cef69442d6180579ef5ba9ef063e/glide_text2im/text2im_model.py#L120)
     # def del_cache(self):
     #     self.cache = None
+    def to(self, device, **kwargs):
+        super().to(device, **kwargs)
+        assert next(self.parameters()).device == device
+        self.device = device
+
 
     def forward(self, x, timesteps, condi_img=None):
         # if self.cache is not None:
