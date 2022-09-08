@@ -5,7 +5,7 @@ import os
 import blobfile as bf
 import torch as th
 import numpy as np
-
+import torch_xla.core.xla_model as xm
 import torch_xla.distributed.xla_multiprocessing as xmp
 
 from torch.optim import AdamW
@@ -40,6 +40,7 @@ class TrainLoop:
         weight_decay=0.0,
         lr_anneal_steps=0,
         index=0,
+        p_uncond=0.2,
         **kwargs,
     ):
         self.model = model
@@ -48,8 +49,9 @@ class TrainLoop:
         self.device = device
         self.data = data
         self.batch_size = batch_size
+        self.p_uncond=p_uncond
         self.microbatch = microbatch if microbatch > 0 else batch_size
-        self.lr = lr*xmp._get_world_size()
+        self.lr = lr*8
         self.ema_rate = (
             [ema_rate]
             if isinstance(ema_rate, float)
@@ -132,7 +134,7 @@ class TrainLoop:
         self.model.to(self.device)
         while (
             not self.lr_anneal_steps
-            or self.step + self.resume_step < self.lr_anneal_steps
+            or self.step + self.resume_step < self.lr_anneal_steps 
         ):
             batch, cond = next(self.data)
             logger.log(f'step: {self.step} starting...')
@@ -140,22 +142,26 @@ class TrainLoop:
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
             if self.step % self.save_interval == 0:
-                if self.index==0:
-                    self.save()
+                self.save()
                 # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
             self.step += 1
+            # xm.rendezvous('init')
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
-            if self.index==0:
-                logger.log(f'Saving {self.step}step checkpoint...')
-                self.save()
+            logger.log(f'Saving {self.step}step checkpoint...')
+            self.save()
         logger.log('Breaking loop...')
 
 
     def run_step(self, batch, cond):
-        self.forward_backward(batch, cond)
+        # classifier-free guidance training
+        if th.rand(1) <= self.p_uncond:
+            cond_ = {'condi_img':th.zeros_like(cond['condi_img']).to(cond['condi_img'])}
+        else:
+            cond_ = cond
+        self.forward_backward(batch, cond_)
         took_step = self.optimize(self.opt)
         if took_step:
             self._update_ema()
@@ -168,7 +174,7 @@ class TrainLoop:
         logger.log(f"grad_norm: {grad_norm}, param_norm: {param_norm}")
         logger.logkv_mean("grad_norm", grad_norm)
         logger.logkv_mean("param_norm", param_norm)
-        opt.step()
+        xm.optimizer_step(opt)
         return True
 
 
@@ -212,6 +218,7 @@ class TrainLoop:
         )
         logger.log(f'loss: {loss}')
         # logger.log("batch loss backward...")
+        self.opt.zero_grad()
         loss.backward(loss)
         # logger.log("batch loss backward completed !")
         '''
@@ -267,27 +274,44 @@ class TrainLoop:
         logger.logkv("step", self.step + self.resume_step)
         logger.logkv("samples", (self.step + self.resume_step + 1) * self.global_batch)
 
-    def save(self):
-        def save_checkpoint(rate, state_dict):
-            logger.log(f"saving model {rate}...")
-            if not rate:
-                filename = f"model{(self.step+self.resume_step):06d}.pt"
-            else:
-                filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
-            with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
-                th.save(state_dict, f)
 
-        save_checkpoint(0, self.model.state_dict())
+    def params_to_state_dict(self, params):
+        state_dict = self.model.state_dict()
+        for i, (name, _value) in enumerate(self.model.named_parameters()):
+            assert name in state_dict
+            state_dict[name] = params[i]
+
+        return state_dict
+
+    def save(self):
+        def save_checkpoint(rate, params):
+            state_dict = self.params_to_state_dict(params)
+            if xm.get_ordinal() == 0:
+                logger.log(f"saving model {rate}...")
+                if not rate:
+                    filename = f"model{(self.step+self.resume_step):06d}.pt"
+                else:
+                    filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
+                with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
+                    th.save(state_dict, f)
+        
+        logger.log(f"saving model...")
+        save_checkpoint(0, list(self.model.parameters()))
+        logger.log(f"Saved model !")
+
         for rate, params in zip(self.ema_rate, self.ema_params):
             logger.log(f"saving ema checkpoint ...")
             save_checkpoint(rate, params)
 
-        with bf.BlobFile(
-            bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
-            "wb",
-        ) as f:
-            th.save(self.opt.state_dict(), f)
+        if xm.get_ordinal() == 0:
+            logger.log(f"saving optimizer ...")
+            with bf.BlobFile(
+                bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
+                "wb",
+            ) as f:
+                th.save(self.opt.state_dict(), f)
 
+        xm.rendezvous('init')
 
 def parse_resume_step_from_filename(filename):
     """
