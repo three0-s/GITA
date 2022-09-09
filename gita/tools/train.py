@@ -14,7 +14,7 @@ from gita.data.teeth_img import PairedTeethImageData
 
 import torch_xla.core.xla_model as xm
 import torch_xla.distributed.xla_multiprocessing as xmp
-import torch_xla.distributed.parallel_loader as pl
+
 
 
 def create_argparser():
@@ -39,25 +39,27 @@ def create_argparser():
     # add_dict_to_argparser(parser, defaults)
     return defaults
 
-def build_dataset(dataloader):
-    while True:
-        yield from dataloader
+
 
 def main():
     args = create_argparser()#.parse_args()
     args.update(num_channels=128, 
                 clip_model_name='ViT-B/16',)
     logger.configure()
+    
     logger.log('='*8+' Creating Clip Encoder... '.center(34)+'='*8)
     clip_model, preprocess = clip.load(args['clip_model_name'])
     img_encoder = clip_model.visual
     logger.log('='*8+' Completed ! '.center(34)+'='*8)
     # model_kwargs = args_to_dict(args, model_and_diffusion_defaults().keys())
+
     args.update(img_encoder=img_encoder, 
                 encoding_dim=img_encoder.output_dim, 
                 aug_level=0.07,
                 seed=928,
+                # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-09-05-27-12-593841/model000000.pt',
                 )
+
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)
     model, diffusion = create_model_and_diffusion(
         **args)
@@ -65,21 +67,20 @@ def main():
     args.update(num_cores=8, diffusion=diffusion)
 
     logger.log('='*8+' INPUT PARAMETERS '.center(34)+'='*8)
-    col_names=[]
-    cols=[]
+    row_names=[]
+    rows=[]
     for key, values in args.items():
         if key in ['model', 'img_encoder']:
             continue
-        col_names.append(key)
-        cols.append([values])
-    logger.log(print_table(col_names, cols))
+        row_names.append(key)
+        rows.append(values)
+    logger.log(print_table(row_names, rows))
     logger.log('='*8+' GITA Training started... '.center(34)+'='*8)
     xmp.spawn(train, args=(args, model), nprocs=args['num_cores'], start_method='fork')    
 
 def train(index, flags, model, **kwargs):
     device = xm.xla_device()
     torch.manual_seed(flags['seed'])
-    logger.log(f"device: {device}, world_size: {xm.xrt_world_size()}")
     dataset = PairedTeethImageData(flags['data_dir'])
     train_sampler = torch.utils.data.distributed.DistributedSampler(
                     dataset,
@@ -89,16 +90,16 @@ def train(index, flags, model, **kwargs):
     loader = DataLoader(dataset, batch_size=flags['batch_size'], 
                         sampler=train_sampler, num_workers=flags['num_cores'],
                         drop_last=True)
-    para_loader = pl.ParallelLoader(loader, [device]).per_device_loader(device)
-    data=build_dataset(para_loader)
-    logger.log('='*8+' Creating Trainer... '.center(34)+'='*8)
+    if xm.is_master_ordinal():
+        logger.log('='*8+' Creating Trainer... '.center(34)+'='*8)
     
     model.to(device)
     
-    trainer = TrainLoop(**flags, model=model, data=data, device=device, index=index)
-    logger.log('='*8+' Created Trainer ! '.center(34)+'='*8)
+    trainer = TrainLoop(**flags, model=model, data=loader, device=device, index=index)
+    if xm.is_master_ordinal():
+        logger.log('='*8+' Created Trainer ! '.center(34)+'='*8)
     trainer.run_loop()
-    # xm.rendezvous('init')
+    xm.mesh_reduce()
 
 if __name__=='__main__':
     main()

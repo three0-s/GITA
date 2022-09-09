@@ -2,6 +2,8 @@ import copy
 import functools
 import os
 
+import torch_xla.distributed.parallel_loader as pl
+
 import blobfile as bf
 import torch as th
 import torch_xla.core.xla_model as xm
@@ -18,6 +20,15 @@ from .resample import LossAwareSampler, UniformSampler
 # We found that the lg_loss_scale quickly climbed to
 # 20-21 within the first ~1K steps of training.
 INITIAL_LOG_LOSS_SCALE = 20.0
+
+
+def build_dataset(dataloader):
+    while True:
+        yield from dataloader
+
+
+def starts_screen(index, width=35):
+    return '\n'.join(['='*width, ' '*width, f'Epoch {index} starts !'.center(width), ' '*width, '='*width]) + '\n'
 
 
 class TrainLoop:
@@ -92,8 +103,9 @@ class TrainLoop:
 
         if resume_checkpoint:
             self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
-            logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
-            self.model.load_state_dict(th.load(resume_checkpoint, map_location=self.device))
+            if xm.is_master_ordinal():
+                logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
+            self.model.load_state_dict(th.load(resume_checkpoint, map_location='cpu'))
 
         self.model.to(self.device)
         return
@@ -125,30 +137,39 @@ class TrainLoop:
         # self.opt.to('cpu')
         if bf.exists(opt_checkpoint):
             logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
-            state_dict = th.load(opt_checkpoint, map_location=self.device)
+            state_dict = th.load(opt_checkpoint, map_location='cpu')
             self.opt.load_state_dict(state_dict)
         self.opt.to(self.device)
 
     def run_loop(self):
         self.model.to(self.device)
+        epoch = 0
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps 
-        ):
-            batch, cond = next(self.data)
-            logger.log(f'step: {self.step} starting...')
-            self.run_step(batch, cond)
-            if self.step % self.log_interval == 0:
-                logger.dumpkvs()
-            if self.step % self.save_interval == 0:
-                self.save()
-                # Run for a finite amount of time in integration tests.
-                if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
-                    return
-            self.step += 1
+        ):  
+            para_loader = pl.ParallelLoader(self.data, [self.device]).per_device_loader(self.device)
+            # data = build_dataset(para_loader)
+            if xm.is_master_ordinal():
+                logger.log(starts_screen(epoch, width=55))
+            for batch, cond in para_loader:
+            # batch, cond = next(data)
+                if xm.is_master_ordinal():
+                    logger.log(f'step: {self.step} starting...')
+                self.run_step(batch, cond)
+                if self.step % self.log_interval == 0:
+                    logger.dumpkvs()
+
+                if self.step % self.save_interval == 0:
+                    self.save()
+                    # Run for a finite amount of time in integration tests.
+                    if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
+                        return
+                self.step += 1
+            epoch += 1
             # xm.rendezvous('init')
         # Save the last checkpoint if it wasn't already saved.
-        if (self.step - 1) % self.save_interval != 0:
+        if (self.step - 1) % self.save_interval != 0 and xm.is_master_ordinal():
             logger.log(f'Saving {self.step}step checkpoint...')
             self.save()
         logger.log('Breaking loop...')
@@ -157,7 +178,8 @@ class TrainLoop:
     def run_step(self, batch, cond):
         # classifier-free guidance training
         if th.rand(1) <= self.p_uncond:
-            logger.log(f'Randomly masking the condition image for unconditional image generation...')
+            if xm.is_master_ordinal():
+                logger.log(f'Randomly masking the condition image for unconditional image generation...')
             cond_ = {'condi_img':th.zeros_like(cond['condi_img']).to(cond['condi_img'])}
         else:
             cond_ = cond
@@ -176,7 +198,7 @@ class TrainLoop:
         logger.log(f"grad_norm: {grad_norm.item()}, param_norm: {param_norm.item()}")
         logger.logkv_mean("grad_norm", grad_norm.item())
         logger.logkv_mean("param_norm", param_norm.item())
-        xm.optimizer_step(opt)
+        xm.optimizer_step(opt, barrier=True)
         return True
 
 
@@ -296,7 +318,8 @@ class TrainLoop:
         
         save_checkpoint(0, self.model.state_dict())
         xm.save(self.opt.state_dict(), os.path.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"), global_master=True)
-        logger.log(f"saved !")
+        if xm.is_master_ordinal():
+            logger.log(f"saved !")
 
 def parse_resume_step_from_filename(filename):
     """
