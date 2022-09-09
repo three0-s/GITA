@@ -6,7 +6,7 @@ from gita.utils.model_creation import create_model_and_diffusion, model_and_diff
 import clip
 
 import torch
-import argparse
+from gita.utils.tables import print_table
 from gita.utils import logger
 from gita.utils.scripts_util import args_to_dict, add_dict_to_argparser
 from torch.utils.data import DataLoader
@@ -44,7 +44,6 @@ def build_dataset(dataloader):
         yield from dataloader
 
 def main():
-
     args = create_argparser()#.parse_args()
     args.update(num_channels=128, 
                 clip_model_name='ViT-B/16',)
@@ -66,11 +65,14 @@ def main():
     args.update(num_cores=8, diffusion=diffusion)
 
     logger.log('='*8+' INPUT PARAMETERS '.center(34)+'='*8)
+    col_names=[]
+    cols=[]
     for key, values in args.items():
         if key in ['model', 'img_encoder']:
             continue
-        logger.logkv(key, values)
-    logger.dumpkvs()
+        col_names.append(key)
+        cols.append([values])
+    logger.log(print_table(col_names, cols))
     logger.log('='*8+' GITA Training started... '.center(34)+'='*8)
     xmp.spawn(train, args=(args, model), nprocs=args['num_cores'], start_method='fork')    
 

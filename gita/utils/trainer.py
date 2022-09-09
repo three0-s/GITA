@@ -4,14 +4,13 @@ import os
 
 import blobfile as bf
 import torch as th
-import numpy as np
 import torch_xla.core.xla_model as xm
-import torch_xla.distributed.xla_multiprocessing as xmp
 
+from copy import deepcopy
 from torch.optim import AdamW
 
+import collections
 from . import logger
-from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 
 
@@ -52,11 +51,11 @@ class TrainLoop:
         self.p_uncond=p_uncond
         self.microbatch = microbatch if microbatch > 0 else batch_size
         self.lr = lr*8
-        self.ema_rate = (
-            [ema_rate]
-            if isinstance(ema_rate, float)
-            else [float(x) for x in ema_rate.split(",")]
-        )
+        # self.ema_rate = (
+        #     [ema_rate]
+        #     if isinstance(ema_rate, float)
+        #     else [float(x) for x in ema_rate.split(",")]
+        # )
         self.log_interval = log_interval
         self.save_interval = save_interval
         self.resume_checkpoint = resume_checkpoint
@@ -76,14 +75,14 @@ class TrainLoop:
             self._load_optimizer_state()
             # Model was resumed, either due to a restart or a checkpoint
             # being specified at the command line.
-            self.ema_params = [
-                self._load_ema_parameters(rate) for rate in self.ema_rate
-            ]
-        else:
-            self.ema_params = [
-                copy.deepcopy(list(self.model.parameters()))
-                for _ in range(len(self.ema_rate))
-            ]
+            # self.ema_params = [
+            #     self._load_ema_parameters(rate) for rate in self.ema_rate
+            # ]
+        # else:
+            # self.ema_params = [
+            #     copy.deepcopy(list(self.model.parameters()))
+            #     for _ in range(len(self.ema_rate))
+            # ]
         self.use_ddp = False
         self.model.to(device)
 
@@ -105,7 +104,7 @@ class TrainLoop:
         return master_params
 
 
-    def _load_ema_parameters(self, rate):
+    # def _load_ema_parameters(self, rate):
         ema_params = copy.deepcopy(list(self.model.parameters()))
 
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -158,22 +157,25 @@ class TrainLoop:
     def run_step(self, batch, cond):
         # classifier-free guidance training
         if th.rand(1) <= self.p_uncond:
+            logger.log(f'Randomly masking the condition image for unconditional image generation...')
             cond_ = {'condi_img':th.zeros_like(cond['condi_img']).to(cond['condi_img'])}
         else:
             cond_ = cond
         self.forward_backward(batch, cond_)
         took_step = self.optimize(self.opt)
-        if took_step:
-            self._update_ema()
+
+        # not using ema 
+        # if took_step:
+        #     self._update_ema()
         self._anneal_lr()
         self.log_step()
 
 
     def optimize(self, opt:th.optim.Optimizer):
         grad_norm, param_norm = self._compute_norms()
-        logger.log(f"grad_norm: {grad_norm}, param_norm: {param_norm}")
-        logger.logkv_mean("grad_norm", grad_norm)
-        logger.logkv_mean("param_norm", param_norm)
+        logger.log(f"grad_norm: {grad_norm.item()}, param_norm: {param_norm.item()}")
+        logger.logkv_mean("grad_norm", grad_norm.item())
+        logger.logkv_mean("param_norm", param_norm.item())
         xm.optimizer_step(opt)
         return True
 
@@ -258,9 +260,9 @@ class TrainLoop:
             logger.log("batch loss backward completed !")
         '''
     
-    def _update_ema(self):
-        for rate, params in zip(self.ema_rate, self.ema_params):
-            update_ema(params, self.model.parameters(), rate=rate)
+    # def _update_ema(self):
+    #     for rate, params in zip(self.ema_rate, self.ema_params):
+    #         update_ema(params, self.model.parameters(), rate=rate)
 
     def _anneal_lr(self):
         if not self.lr_anneal_steps:
@@ -285,33 +287,16 @@ class TrainLoop:
 
     def save(self):
         def save_checkpoint(rate, params):
-            state_dict = self.params_to_state_dict(params)
-            if xm.get_ordinal() == 0:
-                logger.log(f"saving model {rate}...")
-                if not rate:
-                    filename = f"model{(self.step+self.resume_step):06d}.pt"
-                else:
-                    filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
-                with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
-                    th.save(state_dict, f)
+            state_dict = self.params_to_state_dict(params) if type(params) != collections.OrderedDict else params
+            if not rate:
+                filename = f"model{(self.step+self.resume_step):06d}.pt"
+            else:
+                filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
+            xm.save(state_dict, os.path.join(get_blob_logdir(), filename), global_master=True)
         
-        logger.log(f"saving model...")
-        save_checkpoint(0, list(self.model.parameters()))
-        logger.log(f"Saved model !")
-
-        for rate, params in zip(self.ema_rate, self.ema_params):
-            logger.log(f"saving ema checkpoint ...")
-            save_checkpoint(rate, params)
-
-        if xm.get_ordinal() == 0:
-            logger.log(f"saving optimizer ...")
-            with bf.BlobFile(
-                bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
-                "wb",
-            ) as f:
-                th.save(self.opt.state_dict(), f)
-
-        xm.rendezvous('init')
+        save_checkpoint(0, self.model.state_dict())
+        xm.save(self.opt.state_dict(), os.path.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"), global_master=True)
+        logger.log(f"saved !")
 
 def parse_resume_step_from_filename(filename):
     """
@@ -340,14 +325,14 @@ def find_resume_checkpoint():
     return None
 
 
-def find_ema_checkpoint(main_checkpoint, step, rate):
-    if main_checkpoint is None:
-        return None
-    filename = f"ema_{rate}_{(step):06d}.pt"
-    path = bf.join(bf.dirname(main_checkpoint), filename)
-    if bf.exists(path):
-        return path
-    return None
+# def find_ema_checkpoint(main_checkpoint, step, rate):
+#     if main_checkpoint is None:
+#         return None
+#     filename = f"ema_{rate}_{(step):06d}.pt"
+#     path = bf.join(bf.dirname(main_checkpoint), filename)
+#     if bf.exists(path):
+#         return path
+#     return None
 
 
 def log_loss_dict(diffusion, ts, losses):
