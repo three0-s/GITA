@@ -2,51 +2,55 @@ import os
 from clip.clip import BICUBIC
 from torch.utils.data import Dataset
 import torch
-from torchdata.datapipes.iter import FSSpecFileLister
+# from torchdata.datapipes.iter import FSSpecFileLister
 from PIL import Image
 import glob
 import os
 from torchvision.transforms import ToTensor, Resize, Compose, Normalize, RandomCrop, RandomRotation
 
 
-class TeethImageData_GCS(Dataset):
-    def __init__(self, input_img_dir, cond_img_dir, transform=None, device=None, meta={}):
+# # class TeethImageData_GCS(Dataset):
+#     def __init__(self, input_img_dir, cond_img_dir, transform=None, device=None, meta={}):
+#         self.device = device if device != None else "cuda" if torch.cuda.is_available() else "cpu"
+#         #img_dir: gcs bucket path
+
+#         self.input_datapipe = FSSpecFileLister(root=input_img_dir, masks=['*.jpg'])
+#         self.input_file_dp = sorted(list(self.input_datapipe.open_files_by_fsspec(mode='rb')))
+#         self.cond_datapipe = FSSpecFileLister(root=cond_img_dir, masks=['*.jpg'])
+#         self.cond_file_dp = sorted(list(self.cond_datapipe.open_files_by_fsspec(mode='rb')))
+
+#         self.transform = transform
+#         self.img_meta = meta
+
+#     def __len__(self):
+#         return len(self.input_file_dp)
+    
+#     def __getitem__(self, index):
+#         input_img_path = self.input_file_dp[index][1]
+#         input_fname = self.input_file_dp[index][0].split('/')[-1]
+#         input_img = Image.open(input_img_path)
+#         if self.transform:
+#             input_img = self.transform(input_img)
+#         input_img = input_img.to(self.device)
+
+#         cond_img_path = self.cond_file_dp[index][1]
+#         cond_fname = self.cond_file_dp[index][0].split('/')[-1]
+#         cond_img = Image.open(cond_img_path)
+#         if self.transform:
+#             cond_img = self.transform(cond_img)
+#         cond_img = cond_img.to(self.device)
+
+#         sample = {'input_image':input_img, 'input_fname':input_fname, 
+#                   'cond_image':cond_img, 'cond_fname':cond_fname ,**self.img_meta}
+#         return sample
+
+
+class PairedTeethImageData:
+    def __init__(self, img_dir, img_size=64, condi_size=224, transform=None, device=None, meta={}):
+        # super().__init__('', '', transform, device, meta)
         self.device = device if device != None else "cuda" if torch.cuda.is_available() else "cpu"
-        #img_dir: gcs bucket path
-
-        self.input_datapipe = FSSpecFileLister(root=input_img_dir, masks=['*.jpg'])
-        self.input_file_dp = sorted(list(self.input_datapipe.open_files_by_fsspec(mode='rb')))
-        self.cond_datapipe = FSSpecFileLister(root=cond_img_dir, masks=['*.jpg'])
-        self.cond_file_dp = sorted(list(self.cond_datapipe.open_files_by_fsspec(mode='rb')))
-
         self.transform = transform
         self.img_meta = meta
-
-    def __len__(self):
-        return len(self.input_file_dp)
-    
-    def __getitem__(self, index):
-        input_img_path = self.input_file_dp[index][1]
-        input_fname = self.input_file_dp[index][0].split('/')[-1]
-        input_img = Image.open(input_img_path)
-        if self.transform:
-            input_img = self.transform(input_img)
-        input_img = input_img.to(self.device)
-
-        cond_img_path = self.cond_file_dp[index][1]
-        cond_fname = self.cond_file_dp[index][0].split('/')[-1]
-        cond_img = Image.open(cond_img_path)
-        if self.transform:
-            cond_img = self.transform(cond_img)
-        cond_img = cond_img.to(self.device)
-
-        sample = {'input_image':input_img, 'input_fname':input_fname, 
-                  'cond_image':cond_img, 'cond_fname':cond_fname ,**self.img_meta}
-        return sample
-
-class PairedTeethImageData(TeethImageData_GCS):
-    def __init__(self, img_dir, img_size=64, condi_size=224, transform=None, device=None, meta={}):
-        super().__init__('', '', transform, device, meta)
         self.img_dir = img_dir
         self.img_list = glob.glob(os.path.join(img_dir, '*.png'))
         self.img_size = img_size
