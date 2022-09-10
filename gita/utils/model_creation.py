@@ -51,7 +51,6 @@ def create_model(
     resblock_updown,
     use_fp16,
     img_encoder,
-    aug_level,
     encoding_dim,
     **kwargs,
 ):
@@ -76,7 +75,6 @@ def create_model(
     model_cls = GITA
     return model_cls(
         img_encoder=img_encoder,
-        aug_level=aug_level,
         encoding_dim=encoding_dim,  
         in_channels=3,
         model_channels=num_channels,
@@ -183,7 +181,6 @@ def create_model_and_diffusion(
         resblock_updown=resblock_updown,
         use_fp16=use_fp16,
         img_encoder=img_encoder,
-        aug_level=aug_level,
         encoding_dim=encoding_dim,
         **kwargs,
     )

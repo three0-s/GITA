@@ -7,7 +7,7 @@ from .unet import UNetModel
 # @author: ga06033@yonsei.ac.kr (Yewon Lim)
 # Genral Image_to_Image Translation Architecture (GITA)
 class GITA(UNetModel):
-    def __init__(self, img_encoder, aug_level, encoding_dim=512, *args, **kwargs):
+    def __init__(self, img_encoder, encoding_dim=512, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.img_encoder = img_encoder
         for param in self.img_encoder.parameters():
@@ -16,7 +16,6 @@ class GITA(UNetModel):
         self.encoding_dim = encoding_dim
         self.device = list(img_encoder.modules())[1].weight.data.device
         self.dtype = list(img_encoder.modules())[1].weight.data.dtype
-        self.aug_level = aug_level 
         self.embed_linear_transform = nn.Linear(self.encoding_dim, self.model_channels*4, device=self.device, dtype=self.dtype)
         # self.cache = None  # We need to cache encoding (or embedding) of condition image to reduce FLOPS.
         self.img_encoder.to(self.device)
@@ -40,8 +39,9 @@ class GITA(UNetModel):
        
         embedding = self.time_embed(timestep_embedding(timesteps, self.model_channels))
         if condi_img is not None:
-            # embedding augmentation (Gaussian noise)
-            condi_img += th.randn_like(condi_img, dtype=self.dtype, device=self.device) * self.aug_level
+            # # embedding augmentation (Gaussian noise) 
+            # condi_img += th.randn_like(condi_img, dtype=self.dtype, device=self.device) * self.aug_level
+            #   ==> moved to gita/model/img2img.py
             img_embedding = self.img_encoder(condi_img)
                 
             img_embedding = self.embed_linear_transform(img_embedding)

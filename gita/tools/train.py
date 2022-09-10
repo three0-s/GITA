@@ -55,9 +55,9 @@ def main():
 
     args.update(img_encoder=img_encoder, 
                 encoding_dim=img_encoder.output_dim, 
-                aug_level=0.07,
                 seed=928,
-                save_interval=5000,
+                aug_level=0.07,
+                save_interval=2000,
                 # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-09-05-27-12-593841/model000000.pt',
                 )
 
@@ -82,7 +82,7 @@ def main():
 def train(index, flags, model, **kwargs):
     device = xm.xla_device()
     torch.manual_seed(flags['seed'])
-    dataset = PairedTeethImageData(flags['data_dir'])
+    dataset = PairedTeethImageData(flags['data_dir'], istrain=True, condi_aug_level=flags['aug_level'])
     train_sampler = torch.utils.data.distributed.DistributedSampler(
                     dataset,
                     num_replicas=xm.xrt_world_size(),
