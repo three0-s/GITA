@@ -12,16 +12,16 @@ from gita.utils.scripts_util import args_to_dict, add_dict_to_argparser
 from torch.utils.data import DataLoader
 from gita.data.teeth_img import PairedTeethImageData
 
+
 import torch_xla.core.xla_model as xm
 import torch_xla.distributed.xla_multiprocessing as xmp
-
 
 
 def create_argparser():
     defaults = dict(
         data_dir="/home/yewon/GITA/dataset/train",
-        schedule_sampler=None,
-        lr=1e-4,
+        schedule_sampler="uniform_sampler",
+        lr=4e-5,
         weight_decay=1e-4,
         lr_anneal_steps=0,
         batch_size=40,
@@ -57,6 +57,7 @@ def main():
                 encoding_dim=img_encoder.output_dim, 
                 aug_level=0.07,
                 seed=928,
+                save_interval=5000,
                 # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-09-05-27-12-593841/model000000.pt',
                 )
 

@@ -802,7 +802,7 @@ class GaussianDiffusion:
         x_t.to(model.device)
         # logger.log('q sample ends')
         terms = {}
-        logger.log(f'x_t device: {x_t.device}, model device: {model.device}')
+        # logger.log(f'x_t device: {x_t.device}, model device: {model.device}')
             
         if self.loss_type == LossType.KL or self.loss_type == LossType.RESCALED_KL:
             terms["loss"] = self._vb_terms_bpd(

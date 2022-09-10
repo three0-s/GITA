@@ -6,7 +6,7 @@ from torchdata.datapipes.iter import FSSpecFileLister
 from PIL import Image
 import glob
 import os
-from torchvision.transforms import ToTensor, Resize, Compose, Normalize, CenterCrop
+from torchvision.transforms import ToTensor, Resize, Compose, Normalize, RandomCrop, RandomRotation
 
 
 class TeethImageData_GCS(Dataset):
@@ -52,10 +52,14 @@ class PairedTeethImageData(TeethImageData_GCS):
         self.img_size = img_size
         self.condi_size = condi_size
 
-        self.img_resizer = Compose([Resize(self.img_size, interpolation=BICUBIC), CenterCrop(self.img_size),
+        self.img_resizer = Compose([Resize(int(self.img_size*1.2), interpolation=BICUBIC), 
+                                    RandomRotation(25),
+                                    RandomCrop(self.img_size),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
-        self.condi_resizer = Compose([Resize(self.condi_size, interpolation=BICUBIC), CenterCrop(self.condi_size),
+        self.condi_resizer = Compose([Resize(int(self.condi_size*1.2), interpolation=BICUBIC), 
+                                    RandomRotation(25),
+                                    RandomCrop(self.condi_size),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
     def __len__(self):

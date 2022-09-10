@@ -13,7 +13,7 @@ from torch.optim import AdamW
 
 import collections
 from . import logger
-from .resample import LossAwareSampler, UniformSampler
+from .resample import LossAwareSampler, UniformSampler, LossSecondMomentResampler
 
 
 # For ImageNet experiments, this was a good default value.
@@ -70,7 +70,13 @@ class TrainLoop:
         self.log_interval = log_interval
         self.save_interval = save_interval
         self.resume_checkpoint = resume_checkpoint
-        self.schedule_sampler = schedule_sampler or UniformSampler(diffusion)
+
+        if schedule_sampler == "loss_aware_sampler":
+            self.schedule_sampler = LossSecondMomentResampler(diffusion)
+        elif schedule_sampler == "uniform_sampler":
+            self.schedule_sampler = UniformSampler(diffusion)
+        else:
+            raise NotImplementedError("Shedule sampler should be either 'loss_aware_sampler' or 'uniform_sampler'")
         self.weight_decay = weight_decay
         self.lr_anneal_steps = lr_anneal_steps
 
@@ -80,7 +86,7 @@ class TrainLoop:
         self._load_and_sync_parameters()
 
         self.opt = AdamW(
-            self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay
+            self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay, 
         )
         if self.resume_step:
             self._load_optimizer_state()
@@ -94,7 +100,6 @@ class TrainLoop:
             #     copy.deepcopy(list(self.model.parameters()))
             #     for _ in range(len(self.ema_rate))
             # ]
-        self.use_ddp = False
         self.model.to(device)
 
 
@@ -149,11 +154,10 @@ class TrainLoop:
             or self.step + self.resume_step < self.lr_anneal_steps 
         ):  
             para_loader = pl.ParallelLoader(self.data, [self.device]).per_device_loader(self.device)
-            # data = build_dataset(para_loader)
             if xm.is_master_ordinal():
                 logger.log(starts_screen(epoch, width=55))
+
             for batch, cond in para_loader:
-            # batch, cond = next(data)
                 if xm.is_master_ordinal():
                     logger.log(f'step: {self.step} starting...')
                 self.run_step(batch, cond)
@@ -223,8 +227,6 @@ class TrainLoop:
 
     def forward_backward(self, batch, cond):
         self._zero_grad()
-        # logger.log("batch entering...")
-        # logger.log(f'model device: {self.model.device}, saved device: {self.device}')
         t, weights = self.schedule_sampler.sample(batch.shape[0], self.device)
         compute_losses = functools.partial(
                 self.diffusion.training_losses,
@@ -235,6 +237,10 @@ class TrainLoop:
             )
         # logger.log("batch loss caclulating...")
         losses = compute_losses()
+        if isinstance(self.schedule_sampler, LossAwareSampler):
+            self.schedule_sampler.update_with_local_losses(
+                t, losses["loss"].detach()
+            )
         loss = (losses["loss"] * weights).mean()
         # logger.log("batch loss caclulated...")
         log_loss_dict(
