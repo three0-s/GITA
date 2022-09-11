@@ -39,8 +39,8 @@ class PairedTeethImageData(Dataset):
                                     ColorJitter(brightness=(0, 0.5), contrast=(0, 0.5)),
                                     RandomRotation(20),
                                     RandomCrop(self.condi_size),
-                                    GaussianNoise(self.condi_aug_level),
-                                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))]) if self.istrain else \
+                                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+                                    GaussianNoise(self.condi_aug_level),]) if self.istrain else \
                              Compose([Resize((int(self.condi_size),int(self.condi_size)),interpolation=BICUBIC), 
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
