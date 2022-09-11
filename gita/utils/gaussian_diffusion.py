@@ -11,7 +11,6 @@ import math
 import numpy as np
 import torch as th
 from gita.utils import logger
-import torch_xla.core.xla_model as xm
 
 from .nn import mean_flat
 from .losses import normal_kl, discretized_gaussian_log_likelihood
@@ -558,7 +557,15 @@ class GaussianDiffusion:
             from tqdm.auto import tqdm
 
             indices = tqdm(indices)
-
+        try:
+            import torch_xla.core.xla_model as xm
+        except ModuleNotFoundError:
+            class dummy:
+                def __init__(self):
+                    pass
+                def mark_step(self):
+                    pass
+            xm = dummy()
         for i in indices:
             t = th.tensor([i] * shape[0], device=device)
             with th.no_grad():
