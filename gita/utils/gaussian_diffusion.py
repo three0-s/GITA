@@ -11,6 +11,7 @@ import math
 import numpy as np
 import torch as th
 from gita.utils import logger
+import torch_xla.core.xla_model as xm
 
 from .nn import mean_flat
 from .losses import normal_kl, discretized_gaussian_log_likelihood
@@ -572,6 +573,7 @@ class GaussianDiffusion:
                 )
                 yield out
                 img = out["sample"]
+            xm.mark_step()
 
     def ddim_sample(
         self,

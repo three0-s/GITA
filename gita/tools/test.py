@@ -11,6 +11,7 @@ import torch_xla.distributed.xla_multiprocessing as xmp
 import torch_xla.distributed.parallel_loader as pl
 import os
 from torchvision.transforms import Resize
+from tqdm.auto import tqdm
 
 def create_argparser():
     defaults = dict(
@@ -35,15 +36,26 @@ def create_argparser():
     # add_dict_to_argparser(parser, defaults)
     return defaults
 
+def inverse_normalize(img, mean=(0.48145466, 0.4578275, 0.40821073), std=(0.26862954, 0.26130258, 0.27577711)):
+    """
+    :param img: numpy array. shape (C, H, W). [-1~1]
+    :return: numpy array. shape (height, width, channel). [0~1]
+    """
+    for i in range(3):
+        img[:, i,:, :] = ((img[:, i,:,:]) * std[i]) + mean[i]
+
+    return img*255
+
 def save_images(batch: torch.Tensor, fnames, dir):
     """ Save a batch of images. """
-    scaled = ((batch + 1)*127.5).round().clamp(0,255).to(torch.uint8).cpu()
+    scaled = inverse_normalize(batch).round().clamp(0,255)
+    # scaled = xm._maybe_convert_to_cpu(scaled)
     # (B, C, H, W) == > (H, B, W, C) == > (H, B x W, C)
     reshaped = scaled.permute(2, 0, 3, 1).reshape([batch.shape[2], -1, 3])
     images = torch.chunk(reshaped, batch.shape[0], dim=1)
-
-    for i, image in enumerate(images):
-        Image.fromarray(image.numpy()).save(os.path.join(dir, fnames[i]+'.png'))
+    for i, image in tqdm(enumerate(images)):
+        Image.fromarray(image.cpu().to(torch.uint8).numpy()).save(os.path.join(dir, fnames[i]+'.png'))
+        xm.mark_step()
 
 def main():
     args = create_argparser()#.parse_args()
@@ -84,10 +96,9 @@ def main():
     logger.log('='*8+f"Saving results at {args['out_dir']}".center(34)+'='*8)
     os.makedirs(os.path.join(args['out_dir'], 'gt'), exist_ok=True)
     os.makedirs(os.path.join(args['out_dir'], 'pred'), exist_ok=True)
-    os.makedirs(os.path.join(args['out_dir'], 'compare'), exist_ok=True)
+    # os.makedirs(os.path.join(args['out_dir'], 'compare'), exist_ok=True)
     # test(0, args, model, diffusion)
     xmp.spawn(test, args=(args, model, diffusion), nprocs=args['num_cores'], start_method='fork')   
-    
 
 def test(index, flags, model, diffusion):
     device = xm.xla_device()
@@ -130,9 +141,9 @@ def test(index, flags, model, diffusion):
         logger.log(f"Saving {i+1}th images...")
         save_images(gt, fnames, os.path.join(flags['out_dir'], 'gt'))
         save_images(samples, fnames, os.path.join(flags['out_dir'], 'pred'))
-        save_images(torch.concat([condi, samples, gt], axis=-1), fnames, os.path.join(flags['out_dir'], 'compare'))
+        # save_images(torch.concat([condi[:flags['batch_size'], ...], samples, gt], axis=-1).to(gt), fnames, os.path.join(flags['out_dir'], 'compare'))
         # xm.rendezvous('init')
-        
+               
     xm.mesh_reduce() 
 
 if __name__ == '__main__':
