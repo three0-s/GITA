@@ -70,17 +70,22 @@ def main():
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)
     model, diffusion = create_model_and_diffusion(**args)
-    model.eval()
     logger.log('='*8+' Completed ! '.center(34)+'='*8)
-    args.update(num_cores=8)
 
+
+    model.eval()
+    logger.log(f"loading model from {args['resume_checkpoint']}...")
+    model.load_state_dict(torch.load(args['resume_checkpoint'], map_location='cpu'))
+    logger.log('loaded !')
+
+    args.update(num_cores=8)
 
     logger.log('='*8+' GITA Sampling started... '.center(34)+'='*8)
     logger.log('='*8+f"Saving results at {args['out_dir']}".center(34)+'='*8)
     os.makedirs(os.path.join(args['out_dir'], 'gt'), exist_ok=True)
     os.makedirs(os.path.join(args['out_dir'], 'pred'), exist_ok=True)
     os.makedirs(os.path.join(args['out_dir'], 'compare'), exist_ok=True)
-    
+    # test(0, args, model, diffusion)
     xmp.spawn(test, args=(args, model, diffusion), nprocs=args['num_cores'], start_method='fork')   
     
 
@@ -88,16 +93,7 @@ def test(index, flags, model, diffusion):
     device = xm.xla_device()
     torch.manual_seed(flags['seed'])
 
-    if xm.is_master_ordinal():
-        logger.log(f"loading model from {flags['resume_checkpoint']}...")
-        
-    model.load_state_dict(torch.load(flags['resume_checkpoint'], map_location='cpu'))
-    if xm.is_master_ordinal():
-        logger.log('loaded !')
-        
     model.to(device)
-    
-
     
     # Create a classifier-free guidance sampling function
     def model_fn(x_t, ts, **kwargs):
@@ -116,6 +112,9 @@ def test(index, flags, model, diffusion):
     test_loader = pl.ParallelLoader(loader, [device]).per_device_loader(device)
     resizer = Resize(flags['image_size'])
     for i, (batch, cond) in enumerate(test_loader):
+        if xm.is_master_ordinal():
+            logger.log(f"{i+1}th batch...")
+        # xm.master_print(f"batch: {batch.shape} cond: {cond['condi_img'].shape}")
         cond['condi_img'] = torch.concat([cond['condi_img'], torch.zeros_like(cond['condi_img']).to(cond['condi_img'])], dim=0).to(device)
         samples = diffusion.p_sample_loop(
                     model_fn,
@@ -128,9 +127,11 @@ def test(index, flags, model, diffusion):
         gt = batch
         condi = resizer(cond['condi_img'])
         fnames = cond['id']
+        logger.log(f"Saving {i+1}th images...")
         save_images(gt, fnames, os.path.join(flags['out_dir'], 'gt'))
         save_images(samples, fnames, os.path.join(flags['out_dir'], 'pred'))
         save_images(torch.concat([condi, samples, gt], axis=-1), fnames, os.path.join(flags['out_dir'], 'compare'))
+        # xm.rendezvous('init')
         
     xm.mesh_reduce() 
 

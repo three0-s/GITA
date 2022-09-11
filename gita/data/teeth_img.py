@@ -14,8 +14,8 @@ class GaussianNoise(torch.nn.Module):
         self.noise_level = noise_level
     
     def forward(self, x):
-        x += (torch.randn_like(x).to(x) * self.noise_level)
-        return x
+        out = x + (torch.randn_like(x).to(x) * self.noise_level)
+        return out
 
 class PairedTeethImageData(Dataset):
     def __init__(self, img_dir, istrain=True, condi_aug_level=0.07, img_size=64, condi_size=224, transform=None, device=None, meta={}):
@@ -30,18 +30,18 @@ class PairedTeethImageData(Dataset):
         self.istrain = istrain
         self.condi_aug_level = condi_aug_level
 
-        self.img_resizer = Compose([Resize(int(self.img_size*1.1), interpolation=BICUBIC), 
+        self.img_resizer = Compose([Resize((int(self.img_size*1.1),int(self.img_size*1.1)), interpolation=BICUBIC), 
                                     # RandomRotation(25),
                                     RandomCrop(self.img_size),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
-        self.condi_resizer = Compose([Resize(int(self.condi_size*1.1), interpolation=BICUBIC), 
+        self.condi_resizer = Compose([Resize((int(self.condi_size*1.1),int(self.condi_size*1.1)), interpolation=BICUBIC), 
                                     ColorJitter(brightness=(0, 0.5), contrast=(0, 0.5)),
                                     RandomRotation(20),
                                     RandomCrop(self.condi_size),
                                     GaussianNoise(self.condi_aug_level),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))]) if self.istrain else \
-                             Compose([Resize(int(self.condi_size), interpolation=BICUBIC), 
+                             Compose([Resize((int(self.condi_size),int(self.condi_size)),interpolation=BICUBIC), 
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
     def __len__(self):
