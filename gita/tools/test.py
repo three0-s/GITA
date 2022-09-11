@@ -39,7 +39,7 @@ def create_argparser():
 def inverse_normalize(img, mean=(0.48145466, 0.4578275, 0.40821073), std=(0.26862954, 0.26130258, 0.27577711)):
     """
     :param img: numpy array. shape (C, H, W). [-1~1]
-    :return: numpy array. shape (height, width, channel). [0~1]
+    :return: numpy array. shape (height, width, channel). [0~255]
     """
     for i in range(3):
         img[:, i,:, :] = ((img[:, i,:,:]) * std[i]) + mean[i]
@@ -48,9 +48,16 @@ def inverse_normalize(img, mean=(0.48145466, 0.4578275, 0.40821073), std=(0.2686
 
 # dynamic thr from imagen (Photorealistic Text-to-Image Diffusion Models
 #                           with Deep Language Understanding)
+# codes are motivated from https://github.com/lucidrains/imagen-pytorch/blob/e10e92e9198982790bc45fc151e880ae3c47ece1/imagen_pytorch/imagen_pytorch.py#L128
 def dynamic_thr(x:torch.Tensor, p=0.95):
+    def right_pad_dims_to(x, t):
+        padding_dims = x.ndim - t.ndim
+        if padding_dims <= 0:
+            return t
+        return t.view(*t.shape, *((1,) * padding_dims))
     s = torch.quantile(x.reshape(x.shape[0], -1).abs(), p, dim=-1)
-    s = torch.max([s, 1.0])
+    s.clamp_(min=1.0)
+    s = right_pad_dims_to(x, s)
     return x.clamp(-s, s) / s
 
 def save_images(batch: torch.Tensor, fnames, dir):
@@ -68,7 +75,7 @@ def main():
     args = create_argparser()#.parse_args()
     args.update(num_channels=128, 
                 clip_model_name='ViT-B/16',
-                out_dir='/home/yewon/gita-log/base_results')
+                out_dir='/home/yewon/gita-log/dynamic_thr')
 
     logger.configure(dir=args['out_dir'])
     
@@ -83,8 +90,8 @@ def main():
                 aug_level=0.07,
                 save_interval=2000,
                 timestep_respacing='150',
-                guidance_scale = 3.0,
-                resume_checkpoint='/home/yewon/gita-log/gita-2022-09-10-17-49-25-611006/model008000.pt',
+                guidance_scale = 10.0,
+                resume_checkpoint='/home/yewon/gita-log/checkpoint/model005000.pt',
                 )
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)
