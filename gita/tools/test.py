@@ -132,10 +132,18 @@ def test(index, flags, model, diffusion):
         return torch.cat([eps, rest], dim=1)
     
     dataset = PairedTeethImageData(flags['data_dir'], istrain=False, condi_aug_level=flags['aug_level'])
+
+    test_sampler = torch.utils.data.distributed.DistributedSampler(
+                    dataset,
+                    num_replicas=xm.xrt_world_size(),
+                    rank=xm.get_ordinal(),
+                    shuffle=True)
     loader = DataLoader(dataset, batch_size=flags['batch_size'], 
-                        num_workers=flags['num_cores'], drop_last=False)
+                        sampler=test_sampler, num_workers=flags['num_cores'], drop_last=False)
+
     test_loader = pl.ParallelLoader(loader, [device]).per_device_loader(device)
     resizer = Resize(flags['image_size'])
+
     for i, (batch, cond) in enumerate(test_loader):
         if xm.is_master_ordinal():
             logger.log(f"{i+1}th batch...")
@@ -143,13 +151,13 @@ def test(index, flags, model, diffusion):
         cond['condi_img'] = torch.concat([cond['condi_img'], torch.zeros_like(cond['condi_img']).to(cond['condi_img'])], dim=0).to(device)
         samples = diffusion.p_sample_loop(
                     model_fn,
-                    (flags['batch_size']*2, 3, flags["image_size"], flags["image_size"]),
+                    (batch.shape[0]*2, 3, flags["image_size"], flags["image_size"]),
                     device=device,
                     clip_denoised=True,
                     denoised_fn=dynamic_thr,
                     progress=True,
                     model_kwargs=cond,
-                    cond_fn=None,)[:flags['batch_size']]
+                    cond_fn=None,)[:batch.shape[0]]
         gt = batch
         condi = resizer(cond['condi_img'])
         fnames = cond['id']

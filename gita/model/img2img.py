@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from gita.utils.nn import timestep_embedding
 from .unet import UNetModel
+import torch.nn.functional as F
 
 # @author: ga06033@yonsei.ac.kr (Yewon Lim)
 # Genral Image_to_Image Translation Architecture (GITA)
@@ -22,8 +23,6 @@ class GITA(UNetModel):
         self.to(self.device)
         
     # # Motivated by GLIDE (https://github.com/openai/glide-text2im/blob/69b530740eb6cef69442d6180579ef5ba9ef063e/glide_text2im/text2im_model.py#L120)
-    # def del_cache(self):
-    #     self.cache = None
     def to(self, device, **kwargs):
         super().to(device, **kwargs)
         assert next(self.parameters()).device == device
@@ -31,12 +30,6 @@ class GITA(UNetModel):
 
 
     def forward(self, x, timesteps, condi_img=None, **kwargs):
-        # if self.cache is not None:
-        #     img_embedding = self.cache
-        # else:
-        #     img_embedding = self.embed_linear_transform(self.img_encoder(x))
-        #     self.cache = img_embedding
-       
         embedding = self.time_embed(timestep_embedding(timesteps, self.model_channels))
         if condi_img is not None:
             # # embedding augmentation (Gaussian noise) 
@@ -59,3 +52,26 @@ class GITA(UNetModel):
         h = h.type(x.dtype)
         h = self.out(h)
         return h
+
+class SuperResGITA(GITA):
+    """
+    A UNetModel that performs super-resolution.
+
+    Expects an extra kwarg `low_res` to condition on a low-resolution image.
+    """
+
+    def __init__(self, *args, **kwargs):
+        if "in_channels" in kwargs:
+            kwargs = dict(kwargs)
+            kwargs["in_channels"] = kwargs["in_channels"] * 2
+        else:
+            # Curse you, Python. Or really, just curse positional arguments :|.
+            args = list(args)
+            args[1] = args[1] * 2
+        super().__init__(*args, **kwargs)
+
+    def forward(self, x, timesteps, low_res=None, **kwargs):
+        _, _, new_height, new_width = x.shape
+        upsampled = F.interpolate(low_res, (new_height, new_width), mode="bilinear")
+        x = th.cat([x, upsampled], dim=1)
+        return super().forward(x, timesteps, **kwargs)

@@ -1,5 +1,6 @@
 # Motivated from https://github.com/openai/glide-text2im/blob/main/glide_text2im/model_creation.py
-from gita.model.img2img import GITA
+from gita.model.img2img import GITA, SuperResGITA
+from gita.model.unet import SuperResUNetModel
 from .gaussian_diffusion import get_named_beta_schedule
 from .respace import SpacedDiffusion, space_timesteps
 from . import gaussian_diffusion as gd
@@ -8,7 +9,7 @@ from . import gaussian_diffusion as gd
 def model_and_diffusion_defaults():
     return dict(
         image_size=64,
-        num_channels=192,
+        num_channels=128,
         num_res_blocks=3,
         channel_mult="",
         num_heads=1,
@@ -52,6 +53,7 @@ def create_model(
     use_fp16,
     img_encoder,
     encoding_dim,
+    super_res,
     **kwargs,
 ):
     if channel_mult == "":
@@ -71,8 +73,8 @@ def create_model(
     for res in attention_resolutions.split(","):
         attention_ds.append(image_size // int(res))
     
-    # Only supports image to image translation
-    model_cls = GITA
+    # Only supports image to image translation and Upsampling
+    model_cls = GITA if not super_res else  SuperResGITA
     return model_cls(
         img_encoder=img_encoder,
         encoding_dim=encoding_dim,  
@@ -165,6 +167,7 @@ def create_model_and_diffusion(
     img_encoder,
     aug_level,
     encoding_dim,
+    super_res,
     **kwargs,
 ):
     model = create_model(
@@ -182,6 +185,7 @@ def create_model_and_diffusion(
         use_fp16=use_fp16,
         img_encoder=img_encoder,
         encoding_dim=encoding_dim,
+        super_res=super_res,
         **kwargs,
     )
     diffusion = create_gaussian_diffusion(
