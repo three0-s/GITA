@@ -46,6 +46,13 @@ def inverse_normalize(img, mean=(0.48145466, 0.4578275, 0.40821073), std=(0.2686
 
     return img*255
 
+# dynamic thr from imagen (Photorealistic Text-to-Image Diffusion Models
+#                           with Deep Language Understanding)
+def dynamic_thr(x:torch.Tensor, p=0.95):
+    s = torch.quantile(x.reshape(x.shape[0], -1).abs(), p, dim=-1)
+    s = torch.max([s, 1.0])
+    return x.clamp(-s, s) / s
+
 def save_images(batch: torch.Tensor, fnames, dir):
     """ Save a batch of images. """
     scaled = inverse_normalize(batch).round().clamp(0,255)
@@ -132,6 +139,7 @@ def test(index, flags, model, diffusion):
                     (flags['batch_size']*2, 3, flags["image_size"], flags["image_size"]),
                     device=device,
                     clip_denoised=True,
+                    denoised_fn=dynamic_thr,
                     progress=True,
                     model_kwargs=cond,
                     cond_fn=None,)[:flags['batch_size']]
@@ -144,7 +152,6 @@ def test(index, flags, model, diffusion):
         # save_images(torch.concat([condi[:flags['batch_size'], ...], samples, gt], axis=-1).to(gt), fnames, os.path.join(flags['out_dir'], 'compare'))
         # xm.rendezvous('init')
                
-    xm.mesh_reduce() 
 
 if __name__ == '__main__':
     main()
