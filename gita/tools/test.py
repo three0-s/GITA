@@ -10,7 +10,7 @@ import torch_xla.core.xla_model as xm
 import torch_xla.distributed.xla_multiprocessing as xmp
 import torch_xla.distributed.parallel_loader as pl
 import os
-from torchvision.transforms import ToPILImage
+from torchvision.transforms import Resize
 
 def create_argparser():
     defaults = dict(
@@ -48,7 +48,8 @@ def save_images(batch: torch.Tensor, fnames, dir):
 def main():
     args = create_argparser()#.parse_args()
     args.update(num_channels=128, 
-                clip_model_name='ViT-B/16',)
+                clip_model_name='ViT-B/16',
+                out_dir='/home/yewon/gita-log/base_results')
 
     logger.configure(dir=args['out_dir'])
     
@@ -62,13 +63,14 @@ def main():
                 seed=928,
                 aug_level=0.07,
                 save_interval=2000,
-                timestep_respacing='100',
+                timestep_respacing='150',
                 guidance_scale = 3.0,
-                # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-09-05-27-12-593841/model000000.pt',
+                resume_checkpoint='/home/yewon/gita-log/gita-2022-09-10-17-49-25-611006/model008000.pt',
                 )
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)
     model, diffusion = create_model_and_diffusion(**args)
+    model.eval()
     logger.log('='*8+' Completed ! '.center(34)+'='*8)
     args.update(num_cores=8)
 
@@ -77,6 +79,7 @@ def main():
     logger.log('='*8+f"Saving results at {args['out_dir']}".center(34)+'='*8)
     os.makedirs(os.path.join(args['out_dir'], 'gt'), exist_ok=True)
     os.makedirs(os.path.join(args['out_dir'], 'pred'), exist_ok=True)
+    os.makedirs(os.path.join(args['out_dir'], 'compare'), exist_ok=True)
     
     xmp.spawn(test, args=(args, model, diffusion), nprocs=args['num_cores'], start_method='fork')   
     
@@ -86,9 +89,16 @@ def test(index, flags, model, diffusion):
     torch.manual_seed(flags['seed'])
 
     if xm.is_master_ordinal():
-        logger.log('loading model...')
+        logger.log(f"loading model from {flags['resume_checkpoint']}...")
+        
     model.load_state_dict(torch.load(flags['resume_checkpoint'], map_location='cpu'))
+    if xm.is_master_ordinal():
+        logger.log('loaded !')
+        
     model.to(device)
+    
+
+    
     # Create a classifier-free guidance sampling function
     def model_fn(x_t, ts, **kwargs):
         half = x_t[: len(x_t) // 2]
@@ -104,7 +114,9 @@ def test(index, flags, model, diffusion):
     loader = DataLoader(dataset, batch_size=flags['batch_size'], 
                         num_workers=flags['num_cores'], drop_last=False)
     test_loader = pl.ParallelLoader(loader, [device]).per_device_loader(device)
+    resizer = Resize(flags['image_size'])
     for i, (batch, cond) in enumerate(test_loader):
+        cond['condi_img'] = torch.concat([cond['condi_img'], torch.zeros_like(cond['condi_img']).to(cond['condi_img'])], dim=0).to(device)
         samples = diffusion.p_sample_loop(
                     model_fn,
                     (flags['batch_size']*2, 3, flags["image_size"], flags["image_size"]),
@@ -114,13 +126,15 @@ def test(index, flags, model, diffusion):
                     model_kwargs=cond,
                     cond_fn=None,)[:flags['batch_size']]
         gt = batch
-        condi = cond['condi_img']
+        condi = resizer(cond['condi_img'])
         fnames = cond['id']
         save_images(gt, fnames, os.path.join(flags['out_dir'], 'gt'))
         save_images(samples, fnames, os.path.join(flags['out_dir'], 'pred'))
+        save_images(torch.concat([condi, samples, gt], axis=-1), fnames, os.path.join(flags['out_dir'], 'compare'))
         
-
-
     xm.mesh_reduce() 
+
+if __name__ == '__main__':
+    main()
 
 

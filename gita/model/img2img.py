@@ -30,7 +30,7 @@ class GITA(UNetModel):
         self.device = device
 
 
-    def forward(self, x, timesteps, condi_img=None):
+    def forward(self, x, timesteps, condi_img=None, **kwargs):
         # if self.cache is not None:
         #     img_embedding = self.cache
         # else:
