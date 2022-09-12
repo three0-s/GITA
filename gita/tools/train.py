@@ -1,3 +1,4 @@
+from re import M
 import sys
 sys.path.append('/home/yewon/GITA')
 
@@ -43,8 +44,7 @@ def create_argparser():
 
 def main():
     args = create_argparser()#.parse_args()
-    args.update(num_channels=128, 
-                clip_model_name='ViT-B/16',)
+    args.update(clip_model_name='ViT-B/16',)
     logger.configure()
     
     logger.log('='*8+' Creating Clip Encoder... '.center(34)+'='*8)
@@ -57,9 +57,18 @@ def main():
                 encoding_dim=img_encoder.output_dim, 
                 seed=928,
                 aug_level=0.07,
+                num_channels=128, 
                 save_interval=2000,
+                super_res=True, # if True, need do provide the low resolutional images
                 # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-09-05-27-12-593841/model000000.pt',
                 )
+    if args['super_res']:
+        args.update(image_size=256,
+                    num_res_blocks=2,
+                    noise_schedule="linear",
+                    low_res_size=64,
+                    super_res=True,
+                    low_res_dir='/home/yewon/GITA/low_res_dataset/train',)
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)
     model, diffusion = create_model_and_diffusion(
@@ -82,7 +91,13 @@ def main():
 def train(index, flags, model, **kwargs):
     device = xm.xla_device()
     torch.manual_seed(flags['seed'])
-    dataset = PairedTeethImageData(flags['data_dir'], istrain=True, condi_aug_level=flags['aug_level'])
+    dataset = PairedTeethImageData(img_dir=flags['data_dir'],
+                                   istrain=True, 
+                                   condi_aug_level=flags['aug_level'],
+                                   super_res=flags['super_res'],
+                                   low_res_image_dir=flags[''],
+                                   low_res_size=flags['low_res_size'],
+                                   )
     train_sampler = torch.utils.data.distributed.DistributedSampler(
                     dataset,
                     num_replicas=xm.xrt_world_size(),
@@ -100,7 +115,6 @@ def train(index, flags, model, **kwargs):
     if xm.is_master_ordinal():
         logger.log('='*8+' Created Trainer ! '.center(34)+'='*8)
     trainer.run_loop()
-    xm.mesh_reduce()
 
 if __name__=='__main__':
     main()
