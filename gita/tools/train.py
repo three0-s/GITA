@@ -5,6 +5,7 @@ sys.path.append('/home/yewon/GITA')
 from gita.utils.trainer import TrainLoop
 from gita.utils.model_creation import create_model_and_diffusion, model_and_diffusion_defaults
 import clip
+import blobfile as bf
 
 import torch
 from gita.utils.tables import print_table
@@ -40,7 +41,19 @@ def create_argparser():
     # add_dict_to_argparser(parser, defaults)
     return defaults
 
-
+def parse_resume_step_from_filename(filename):
+    """
+    Parse filenames of the form path/to/modelNNNNNN.pt, where NNNNNN is the
+    checkpoint's number of steps.
+    """
+    split = filename.split("model")
+    if len(split) < 2:
+        return 0
+    split1 = split[-1].split(".")[0]
+    try:
+        return int(split1)
+    except ValueError:
+        return 0
 
 def main():
     args = create_argparser()#.parse_args()
@@ -56,26 +69,27 @@ def main():
     args.update(img_encoder=img_encoder, 
                 encoding_dim=img_encoder.output_dim, 
                 seed=928,
-                aug_level=0.07,
+                aug_level=0.3,
                 num_channels=128, 
                 save_interval=2000,
-                super_res=True, # if True, need do provide the low resolutional images
-                # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-09-05-27-12-593841/model000000.pt',
+                super_res=False, # if True, need do provide the low resolutional images
+                resume_checkpoint='/home/yewon/gita-log/gita-2022-09-11-16-19-11-842728/model012000.pt',
+                low_res_dir=None,
+                low_res_size=64,
                 )
     if args['super_res']:
         args.update(image_size=256,
                     num_res_blocks=2,
                     noise_schedule="linear",
                     low_res_size=64,
-                    super_res=True,
                     low_res_dir='/home/yewon/GITA/low_res_dataset/train',)
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)
     model, diffusion = create_model_and_diffusion(
         **args)
-    logger.log('='*8+' Completed ! '.center(34)+'='*8)
+    logger.log('='*8+f'{type(model)} generated ! '.center(34)+'='*8)
     args.update(num_cores=8, diffusion=diffusion)
-
+    
     logger.log('='*8+' INPUT PARAMETERS '.center(34)+'='*8)
     row_names=[]
     rows=[]
@@ -95,7 +109,7 @@ def train(index, flags, model, **kwargs):
                                    istrain=True, 
                                    condi_aug_level=flags['aug_level'],
                                    super_res=flags['super_res'],
-                                   low_res_image_dir=flags[''],
+                                   low_res_image_dir=flags['low_res_dir'],
                                    low_res_size=flags['low_res_size'],
                                    )
     train_sampler = torch.utils.data.distributed.DistributedSampler(

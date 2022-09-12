@@ -83,13 +83,16 @@ class TrainLoop:
         self.step = 0
         self.resume_step = 0
         self.global_batch = self.batch_size * 8
+
         self._load_and_sync_parameters()
 
         self.opt = AdamW(
             self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay, 
-        )
-        if self.resume_step:
-            self._load_optimizer_state()
+        ) 
+        # self._load_optimizer_state()
+        
+        # if self.resume_step:
+        #     self._load_optimizer_state()
             # Model was resumed, either due to a restart or a checkpoint
             # being specified at the command line.
             # self.ema_params = [
@@ -139,27 +142,24 @@ class TrainLoop:
         opt_checkpoint = bf.join(
             bf.dirname(main_checkpoint), f"opt{self.resume_step:06}.pt"
         )
-        # self.opt.to('cpu')
         if bf.exists(opt_checkpoint):
+            # xm.rendezvous('loading optimizer')
             logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
-            state_dict = th.load(opt_checkpoint, map_location='cpu')
-            self.opt.load_state_dict(state_dict)
-        self.opt.to(self.device)
+            self.opt.load_state_dict(th.load(opt_checkpoint, map_location='cpu'))
+            
+            logger.log("Optimizer loaded !")
+        return
 
     def run_loop(self):
         self.model.to(self.device)
-        epoch = 0
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps 
         ):  
             para_loader = pl.ParallelLoader(self.data, [self.device]).per_device_loader(self.device)
-            if xm.is_master_ordinal():
-                logger.log(starts_screen(epoch, width=55))
-
             for batch, cond in para_loader:
                 if xm.is_master_ordinal():
-                    logger.log(f'step: {self.step} starting...')
+                    logger.log(f'step: {self.step + self.resume_step} starting...')
                 self.run_step(batch, cond)
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
@@ -170,11 +170,10 @@ class TrainLoop:
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
                 self.step += 1
-            epoch += 1
             # xm.rendezvous('init')
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0 and xm.is_master_ordinal():
-            logger.log(f'Saving {self.step}step checkpoint...')
+            logger.log(f'Saving {self.step + self.resume_step} step checkpoint...')
             self.save()
         logger.log('Breaking loop...')
 

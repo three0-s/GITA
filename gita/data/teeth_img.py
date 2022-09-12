@@ -24,7 +24,7 @@ class PairedTeethImageData(Dataset):
             super_res=False, 
             low_res_image_dir=None, 
             low_res_size=64, 
-            condi_aug_level=0.07,
+            condi_aug_level=0.3,
             img_size=64, 
             condi_size=224, 
             transform=None, 
