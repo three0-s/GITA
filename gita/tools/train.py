@@ -41,20 +41,6 @@ def create_argparser():
     # add_dict_to_argparser(parser, defaults)
     return defaults
 
-def parse_resume_step_from_filename(filename):
-    """
-    Parse filenames of the form path/to/modelNNNNNN.pt, where NNNNNN is the
-    checkpoint's number of steps.
-    """
-    split = filename.split("model")
-    if len(split) < 2:
-        return 0
-    split1 = split[-1].split(".")[0]
-    try:
-        return int(split1)
-    except ValueError:
-        return 0
-
 def main():
     args = create_argparser()#.parse_args()
     args.update(clip_model_name='ViT-B/16',)
@@ -72,9 +58,9 @@ def main():
                 aug_level=0.3,
                 num_channels=128, 
                 save_interval=2000,
-                super_res=False, # if True, need do provide the low resolutional images
-                resume_checkpoint='/home/yewon/gita-log/gita-2022-09-11-16-19-11-842728/model012000.pt',
-                low_res_dir=None,
+                super_res=True, # if True, need do provide the low resolutional images
+                # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-11-16-19-11-842728/model012000.pt',
+                low_res_dir='/home/yewon/GITA/low_res_dataset/train',
                 low_res_size=64,
                 )
     if args['super_res']:

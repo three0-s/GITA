@@ -70,8 +70,8 @@ class SuperResGITA(GITA):
             args[1] = args[1] * 2
         super().__init__(*args, **kwargs)
 
-    def forward(self, x, timesteps, low_res=None, **kwargs):
+    def forward(self, x, timesteps, condi_img=None, low_res=None, **kwargs):
         _, _, new_height, new_width = x.shape
         upsampled = F.interpolate(low_res, (new_height, new_width), mode="bilinear")
         x = th.cat([x, upsampled], dim=1)
-        return super().forward(x, timesteps, **kwargs)
+        return super().forward(x, timesteps, condi_img=condi_img, **kwargs)

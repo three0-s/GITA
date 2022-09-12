@@ -124,19 +124,6 @@ class TrainLoop:
         return master_params
 
 
-    # def _load_ema_parameters(self, rate):
-        ema_params = copy.deepcopy(list(self.model.parameters()))
-
-        main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
-        ema_checkpoint = find_ema_checkpoint(main_checkpoint, self.resume_step, rate)
-
-        if ema_checkpoint:
-            logger.log(f"loading EMA from checkpoint: {ema_checkpoint}...")
-            state_dict = th.load(ema_checkpoint, map_location=self.device)
-            ema_params = self._state_dict_to_master_params(state_dict)
-
-        return ema_params
-
     def _load_optimizer_state(self):
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
         opt_checkpoint = bf.join(
@@ -180,12 +167,12 @@ class TrainLoop:
 
     def run_step(self, batch, cond):
         # classifier-free guidance training
+        cond_ = cond
         if th.rand(1) <= self.p_uncond:
             if xm.is_master_ordinal():
                 logger.log(f'Randomly masking the condition image for unconditional image generation...')
-            cond_ = {'condi_img':th.zeros_like(cond['condi_img']).to(cond['condi_img'])}
-        else:
-            cond_ = cond
+            cond_['condi_img'] = th.zeros_like(cond['condi_img']).to(cond['condi_img'])
+
         self.forward_backward(batch, cond_)
         took_step = self.optimize(self.opt)
 

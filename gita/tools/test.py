@@ -77,11 +77,11 @@ def main():
     args = create_argparser()#.parse_args()
     args.update(num_channels=128, 
                 clip_model_name='ViT-B/16',
-                out_dir='/home/yewon/gita-log/train_results',
+                out_dir='/home/yewon/GITA/low_res_dataset/train',
                 use_dynamic_thr=True,
-                guidance_scale = 3.0,)
+                guidance_scale = 4.0,)
     mode = 'dynamic' if args['use_dynamic_thr'] else 'static'
-    args['out_dir'] += f"_{mode}_guidance_{args['guidance_scale']}"
+    # args['out_dir'] += f"_{mode}_guidance_{args['guidance_scale']}"
     os.makedirs(args['out_dir'], exist_ok=True)
     logger.configure(dir=args['out_dir'])
     
@@ -96,7 +96,7 @@ def main():
                 aug_level=0.07,
                 save_interval=2000,
                 timestep_respacing='150',
-                resume_checkpoint='/home/yewon/gita-log/checkpoint/model010000.pt',
+                resume_checkpoint='/home/yewon/gita-log/checkpoint/model012000.pt',
                 )
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)

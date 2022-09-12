@@ -60,6 +60,8 @@ class PairedTeethImageData(Dataset):
         self.img_resizer = Compose([Resize((int(self.img_size*1.1),int(self.img_size*1.1)), interpolation=BICUBIC), 
                                     ColorJitter(brightness=0.2, contrast=0.3),
                                     RandomCrop(self.img_size),
+                                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])if self.istrain else \
+                           Compose([Resize((int(self.img_size),int(self.img_size)),interpolation=BICUBIC), 
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
         self.condi_resizer = Compose([Resize((int(self.condi_size*1.1),int(self.condi_size*1.1)), interpolation=BICUBIC), 
