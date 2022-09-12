@@ -31,7 +31,10 @@ class PairedTeethImageData(Dataset):
             device=None, 
             meta={}):
         super().__init__()
-        assert (super_res and (low_res_image_dir != None) or (not super_res), f"if super_res==True, then low_res_image_path should be given")
+        if super_res:
+            if low_res_image_dir == None:
+                raise AssertionError(f"if super_res==True, then low_res_image_path should be given")
+        
         self.device = device if device != None else "cuda" if torch.cuda.is_available() else "cpu"
         self.transform = transform
         self.img_meta = meta
@@ -53,14 +56,14 @@ class PairedTeethImageData(Dataset):
         self.istrain = istrain
         self.condi_aug_level = condi_aug_level
         self.super_res = super_res
-
-        self.img_resizer = Compose([Resize((int(self.img_size*1.2),int(self.img_size*1.2)), interpolation=BICUBIC), 
-                                    ColorJitter(brightness=0.2, contrast=0.2),
+        # 220912 Augmentation confirmed
+        self.img_resizer = Compose([Resize((int(self.img_size*1.1),int(self.img_size*1.1)), interpolation=BICUBIC), 
+                                    ColorJitter(brightness=0.2, contrast=0.3),
                                     RandomCrop(self.img_size),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
-        self.condi_resizer = Compose([Resize((int(self.condi_size*1.2),int(self.condi_size*1.2)), interpolation=BICUBIC), 
-                                    ColorJitter(brightness=0.2, contrast=0.2),
+        self.condi_resizer = Compose([Resize((int(self.condi_size*1.1),int(self.condi_size*1.1)), interpolation=BICUBIC), 
+                                    ColorJitter(brightness=0.2, contrast=0.3),
                                     RandomRotation(20),
                                     RandomCrop(self.condi_size),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
