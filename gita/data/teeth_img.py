@@ -54,13 +54,13 @@ class PairedTeethImageData(Dataset):
         self.condi_aug_level = condi_aug_level
         self.super_res = super_res
 
-        self.img_resizer = Compose([Resize((int(self.img_size*1.1),int(self.img_size*1.1)), interpolation=BICUBIC), 
-                                    # RandomRotation(25),
+        self.img_resizer = Compose([Resize((int(self.img_size*1.2),int(self.img_size*1.2)), interpolation=BICUBIC), 
+                                    ColorJitter(brightness=0.2, contrast=0.2),
                                     RandomCrop(self.img_size),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
-        self.condi_resizer = Compose([Resize((int(self.condi_size*1.1),int(self.condi_size*1.1)), interpolation=BICUBIC), 
-                                    ColorJitter(brightness=(0, 0.5), contrast=(0, 0.5)),
+        self.condi_resizer = Compose([Resize((int(self.condi_size*1.2),int(self.condi_size*1.2)), interpolation=BICUBIC), 
+                                    ColorJitter(brightness=0.2, contrast=0.2),
                                     RandomRotation(20),
                                     RandomCrop(self.condi_size),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
