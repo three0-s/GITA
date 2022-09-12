@@ -22,7 +22,6 @@ class PairedTeethImageData(Dataset):
             img_dir, 
             istrain=True, 
             super_res=False, 
-            low_res_image_dir=None, 
             low_res_size=64, 
             condi_aug_level=0.3,
             img_size=64, 
@@ -31,25 +30,13 @@ class PairedTeethImageData(Dataset):
             device=None, 
             meta={}):
         super().__init__()
-        if super_res:
-            if low_res_image_dir == None:
-                raise AssertionError(f"if super_res==True, then low_res_image_path should be given")
         
         self.device = device if device != None else "cuda" if torch.cuda.is_available() else "cpu"
         self.transform = transform
         self.img_meta = meta
         self.img_dir = img_dir
         self.img_list = sorted(glob.glob(os.path.join(img_dir, '*.png')))
-        if super_res:
-            self.low_res_list = sorted(glob.glob(os.path.join(low_res_image_dir, '*.png')))
-            self.img_low_res_list = []
-            for img in self.img_list:
-                for low in self.low_res_list:
-                    if img.split('/')[-1].split('.')[0] == low.split('/')[-1].split('.')[0]:
-                        self.img_low_res_list.append((img, low))
-                        break
-
-            self.low_res_size = low_res_size
+        self.low_res_size = low_res_size
 
         self.img_size = img_size
         self.condi_size = condi_size
@@ -84,16 +71,13 @@ class PairedTeethImageData(Dataset):
 
     def __getitem__(self, index):
         img_path = self.img_list[index]
-        low_res = None
-        if self.super_res:
-            img_path, low_res_img_path = self.img_low_res_list[index]
-            low_res = ToTensor()(Image.open(low_res_img_path))
-
         img_id = img_path.split('/')[-1].split('.')[0]
         img = ToTensor()(Image.open(img_path))
-        condi, input_img = torch.chunk(img, 2, dim=-1)
+        cond, input_img = torch.chunk(img, 2, dim=-1)
         input_img = self.img_resizer(input_img)
-        condi = self.condi_resizer(condi)
+        condi = self.condi_resizer(cond)
+        if self.super_res:
+            low_res = self.noise_aug(cond)
         
         
         # sample = {'input_image':input_img, 'img_id':img_id, 

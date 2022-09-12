@@ -60,15 +60,13 @@ def main():
                 save_interval=2000,
                 super_res=True, # if True, need do provide the low resolutional images
                 # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-11-16-19-11-842728/model012000.pt',
-                low_res_dir='/home/yewon/GITA/low_res_dataset/train',
                 low_res_size=64,
                 )
     if args['super_res']:
         args.update(image_size=256,
                     num_res_blocks=2,
                     noise_schedule="linear",
-                    low_res_size=64,
-                    low_res_dir='/home/yewon/GITA/low_res_dataset/train',)
+                    low_res_size=64,)
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)
     model, diffusion = create_model_and_diffusion(
@@ -95,7 +93,6 @@ def train(index, flags, model, **kwargs):
                                    istrain=True, 
                                    condi_aug_level=flags['aug_level'],
                                    super_res=flags['super_res'],
-                                   low_res_image_dir=flags['low_res_dir'],
                                    low_res_size=flags['low_res_size'],
                                    )
     train_sampler = torch.utils.data.distributed.DistributedSampler(
