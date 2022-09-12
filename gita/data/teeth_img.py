@@ -93,4 +93,6 @@ class PairedTeethImageData(Dataset):
         
         # sample = {'input_image':input_img, 'img_id':img_id, 
         #           'cond_image':condi, **self.img_meta}
-        return (input_img.to(self.device), {'condi_img':condi.to(self.device), 'id':img_id, 'low_res':low_res})
+        kwargs = {'condi_img':condi.to(self.device), 'id':img_id, 'low_res':low_res} if self.super_res else \
+                 {'condi_img':condi.to(self.device), 'id':img_id}
+        return (input_img.to(self.device), kwargs)

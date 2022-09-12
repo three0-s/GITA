@@ -3,6 +3,7 @@ import torch
 from gita.utils.model_creation import create_model_and_diffusion, model_and_diffusion_defaults
 import clip
 from torch.utils.data import DataLoader
+from gita.utils.tables import print_table
 from gita.data.teeth_img import PairedTeethImageData
 from gita.utils import logger
 
@@ -15,13 +16,14 @@ from tqdm.auto import tqdm
 
 def create_argparser():
     defaults = dict(
-        data_dir="/home/yewon/GITA/dataset/val",
+        data_dir="/home/yewon/GITA/dataset/train",
         out_dir='',
         schedule_sampler="uniform_sampler",
         lr=4e-5,
         weight_decay=1e-4,
         lr_anneal_steps=0,
         batch_size=40,
+        use_dynamic_thr=False,
         microbatch=-1,  # -1 disables microbatches
         ema_rate="0.9999",  # comma-separated list of EMA values
         log_interval=10,
@@ -75,8 +77,12 @@ def main():
     args = create_argparser()#.parse_args()
     args.update(num_channels=128, 
                 clip_model_name='ViT-B/16',
-                out_dir='/home/yewon/gita-log/dynamic_thr')
-
+                out_dir='/home/yewon/gita-log/train_results',
+                use_dynamic_thr=True,
+                guidance_scale = 3.0,)
+    mode = 'dynamic' if args['use_dynamic_thr'] else 'static'
+    args['out_dir'] += f"_{mode}_guidance_{args['guidance_scale']}"
+    os.makedirs(args['out_dir'], exist_ok=True)
     logger.configure(dir=args['out_dir'])
     
     logger.log('='*8+' Creating Clip Encoder... '.center(34)+'='*8)
@@ -90,8 +96,7 @@ def main():
                 aug_level=0.07,
                 save_interval=2000,
                 timestep_respacing='150',
-                guidance_scale = 10.0,
-                resume_checkpoint='/home/yewon/gita-log/checkpoint/model005000.pt',
+                resume_checkpoint='/home/yewon/gita-log/checkpoint/model010000.pt',
                 )
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)
@@ -105,9 +110,19 @@ def main():
     logger.log('loaded !')
 
     args.update(num_cores=8)
-
+    logger.log('='*8+' INPUT PARAMETERS '.center(34)+'='*8)
+    row_names=[]
+    rows=[]
+    for key, values in args.items():
+        if key in ['model', 'img_encoder']:
+            continue
+        row_names.append(key)
+        rows.append(values)
+    logger.log(print_table(row_names, rows))
     logger.log('='*8+' GITA Sampling started... '.center(34)+'='*8)
     logger.log('='*8+f"Saving results at {args['out_dir']}".center(34)+'='*8)
+
+    
     os.makedirs(os.path.join(args['out_dir'], 'gt'), exist_ok=True)
     os.makedirs(os.path.join(args['out_dir'], 'pred'), exist_ok=True)
     # os.makedirs(os.path.join(args['out_dir'], 'compare'), exist_ok=True)
@@ -149,12 +164,13 @@ def test(index, flags, model, diffusion):
             logger.log(f"{i+1}th batch...")
         # xm.master_print(f"batch: {batch.shape} cond: {cond['condi_img'].shape}")
         cond['condi_img'] = torch.concat([cond['condi_img'], torch.zeros_like(cond['condi_img']).to(cond['condi_img'])], dim=0).to(device)
+        f = dynamic_thr if flags['use_dynamic_thr'] else None
         samples = diffusion.p_sample_loop(
                     model_fn,
                     (batch.shape[0]*2, 3, flags["image_size"], flags["image_size"]),
                     device=device,
                     clip_denoised=True,
-                    denoised_fn=dynamic_thr,
+                    denoised_fn=f,
                     progress=True,
                     model_kwargs=cond,
                     cond_fn=None,)[:batch.shape[0]]
