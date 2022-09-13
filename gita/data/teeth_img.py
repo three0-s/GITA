@@ -73,11 +73,11 @@ class PairedTeethImageData(Dataset):
         img_path = self.img_list[index]
         img_id = img_path.split('/')[-1].split('.')[0]
         img = ToTensor()(Image.open(img_path))
-        cond, input_img = torch.chunk(img, 2, dim=-1)
-        input_img = self.img_resizer(input_img)
-        condi = self.condi_resizer(cond)
+        condi, input_im = torch.chunk(img, 2, dim=-1)
+        input_img = self.img_resizer(input_im)
+        condi = self.condi_resizer(condi)
         if self.super_res:
-            low_res = self.noise_aug(cond)
+            low_res = self.noise_aug(input_im)
         
         
         # sample = {'input_image':input_img, 'img_id':img_id, 
