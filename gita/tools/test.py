@@ -16,7 +16,7 @@ from tqdm.auto import tqdm
 
 def create_argparser():
     defaults = dict(
-        data_dir="/home/yewon/GITA/dataset/train",
+        data_dir="/home/yewon/GITA/dataset/val",
         out_dir='',
         schedule_sampler="uniform_sampler",
         lr=4e-5,
@@ -76,12 +76,16 @@ def save_images(batch: torch.Tensor, fnames, dir):
 def main():
     args = create_argparser()#.parse_args()
     args.update(num_channels=128, 
+                data_dir="/home/yewon/GITA/dataset/val",
                 clip_model_name='ViT-B/16',
-                out_dir='/home/yewon/GITA/low_res_dataset/train',
+                out_dir='/home/yewon/gita-log/val',
+                resume_checkpoint='/home/yewon/gita-log/base-checkpoint/model018000.pt',
                 use_dynamic_thr=True,
-                guidance_scale = 4.0,)
+                guidance_scale = 2.0
+                )
+    timestep = args['resume_checkpoint'].split('/')[-1].split('.')[0]
     mode = 'dynamic' if args['use_dynamic_thr'] else 'static'
-    # args['out_dir'] += f"_{mode}_guidance_{args['guidance_scale']}"
+    args['out_dir'] += f"_{mode}_guidance_{args['guidance_scale']}_{timestep}"
     os.makedirs(args['out_dir'], exist_ok=True)
     logger.configure(dir=args['out_dir'])
     
@@ -95,8 +99,7 @@ def main():
                 seed=928,
                 aug_level=0.07,
                 save_interval=2000,
-                timestep_respacing='150',
-                resume_checkpoint='/home/yewon/gita-log/checkpoint/model012000.pt',
+                timestep_respacing='250',
                 )
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)

@@ -1,4 +1,3 @@
-from re import M
 import sys
 sys.path.append('/home/yewon/GITA')
 
@@ -26,7 +25,7 @@ def create_argparser():
         lr=4e-5,
         weight_decay=1e-4,
         lr_anneal_steps=0,
-        batch_size=40,
+        batch_size=32,
         microbatch=-1,  # -1 disables microbatches
         ema_rate="0.9999",  # comma-separated list of EMA values
         log_interval=10,
@@ -64,6 +63,7 @@ def main():
                 )
     if args['super_res']:
         args.update(image_size=256,
+                    num_channels=96,
                     num_res_blocks=2,
                     noise_schedule="linear",
                     low_res_size=64,)
@@ -90,6 +90,7 @@ def train(index, flags, model, **kwargs):
     device = xm.xla_device()
     torch.manual_seed(flags['seed'])
     dataset = PairedTeethImageData(img_dir=flags['data_dir'],
+                                   img_size=flags['image_size'],
                                    istrain=True, 
                                    condi_aug_level=flags['aug_level'],
                                    super_res=flags['super_res'],
