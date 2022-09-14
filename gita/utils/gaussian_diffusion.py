@@ -827,18 +827,16 @@ class GaussianDiffusion:
                 terms["loss"] *= self.num_timesteps
         elif self.loss_type == LossType.MSE or self.loss_type == LossType.RESCALED_MSE:
             # logger.log('model forwarding')
-            if model_kwargs['is_train'][0]:
-                # forwarding model with noise augmented images
-                new_kwargs = {}
-                for key in model_kwargs.keys():
-                    if key in ['condi_img', 'low_res']:
-                        z_s = self.q_sample(model_kwargs[key], s)
-                        z_s.to(model.device)
-                        new_kwargs[key] = z_s
-                    else:
-                        new_kwargs[key] = model_kwargs[key]
-            else:
-                new_kwargs = model_kwargs
+            
+            # forwarding model with noise augmented images
+            new_kwargs = {}
+            for key in model_kwargs.keys():
+                if key in ['low_res']:
+                    z_s = self.q_sample(model_kwargs[key], s)
+                    z_s.to(model.device)
+                    new_kwargs[key] = z_s
+                else:
+                    new_kwargs[key] = model_kwargs[key]
 
             model_output = model(x_t, self._scale_timesteps(t), **new_kwargs)
             # logger.log('model forward completed')
@@ -851,7 +849,6 @@ class GaussianDiffusion:
                 B, C = x_t.shape[:2]
                 assert model_output.shape == (B, C * 2, *x_t.shape[2:])
                 model_output, model_var_values = th.split(model_output, C, dim=1)
-                # logger.log(f'model_mean shape: {model_output.shape}\nmodel_var shape: {model_var_values.shape}')
                 # Learn the variance using the variational bound, but don't let
                 # it affect our mean prediction.
                 frozen_out = th.cat([model_output.detach(), model_var_values], dim=1)
