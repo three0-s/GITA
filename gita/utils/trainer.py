@@ -139,11 +139,14 @@ class TrainLoop:
 
     def run_loop(self):
         self.model.to(self.device)
+        epoch=0
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps 
         ):  
             para_loader = pl.ParallelLoader(self.data, [self.device]).per_device_loader(self.device)
+            if xm.is_master_ordinal():
+                logger.log(starts_screen(epoch))
             for batch, cond in para_loader:
                 if xm.is_master_ordinal():
                     logger.log(f'step: {self.step + self.resume_step} starting...')
@@ -157,6 +160,9 @@ class TrainLoop:
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
                 self.step += 1
+            epoch += 1
+            # if (epoch+1)%1000 == 0:
+
             # xm.rendezvous('init')
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0 and xm.is_master_ordinal():
@@ -214,11 +220,13 @@ class TrainLoop:
     def forward_backward(self, batch, cond):
         self._zero_grad()
         t, weights = self.schedule_sampler.sample(batch.shape[0], self.device)
+        s, weights = self.schedule_sampler.sample(batch.shape[0], self.device)
         compute_losses = functools.partial(
                 self.diffusion.training_losses,
                 self.model,
                 batch,
                 t,
+                s,
                 model_kwargs=cond,
             )
         # logger.log("batch loss caclulating...")

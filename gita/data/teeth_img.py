@@ -44,27 +44,26 @@ class PairedTeethImageData(Dataset):
         self.condi_aug_level = condi_aug_level
         self.super_res = super_res
         # 220912 Augmentation confirmed
-        self.img_resizer = Compose([Resize((int(self.img_size*1.1),int(self.img_size*1.1)), interpolation=BICUBIC), 
-                                    ColorJitter(brightness=0.2, contrast=0.3),
+        self.img_resizer = Compose([Resize((int(self.img_size*1.12),int(self.img_size*1.12)), interpolation=BICUBIC), 
+                                    ColorJitter(brightness=0.1, contrast=0.1),
                                     RandomCrop(self.img_size),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])if self.istrain else \
                            Compose([Resize((int(self.img_size),int(self.img_size)),interpolation=BICUBIC), 
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
 
-        self.condi_resizer = Compose([Resize((int(self.condi_size*1.1),int(self.condi_size*1.1)), interpolation=BICUBIC), 
-                                    ColorJitter(brightness=0.2, contrast=0.3),
-                                    RandomRotation(20),
+        self.condi_resizer = Compose([Resize((int(self.condi_size*1.12),int(self.condi_size*1.12)), interpolation=BICUBIC), 
+                                    ColorJitter(brightness=0.1, contrast=0.1),
+                                    # RandomRotation(10),
                                     RandomCrop(self.condi_size),
-                                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
-                                    GaussianNoise(self.condi_aug_level),]) if self.istrain else \
+                                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),]) if self.istrain else \
                              Compose([Resize((int(self.condi_size),int(self.condi_size)),interpolation=BICUBIC), 
-                                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
+                                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])       
+                                    # GaussianNoise(self.condi_aug_level),]) if self.istrain else \
+                             
         if super_res:
             self.noise_aug = Compose([Resize((int(self.low_res_size),int(self.low_res_size)), interpolation=BICUBIC), 
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
-                                    GaussianNoise(self.condi_aug_level),]) if self.istrain else \
-                             Compose([Resize((int(self.low_res_size),int(self.low_res_size)),interpolation=BICUBIC), 
-                                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
+                                    ])
                              
     def __len__(self):
         return len(self.img_list)
@@ -82,6 +81,6 @@ class PairedTeethImageData(Dataset):
         
         # sample = {'input_image':input_img, 'img_id':img_id, 
         #           'cond_image':condi, **self.img_meta}
-        kwargs = {'condi_img':condi.to(self.device), 'id':img_id, 'low_res':low_res} if self.super_res else \
-                 {'condi_img':condi.to(self.device), 'id':img_id}
+        kwargs = {'condi_img':condi.to(self.device), 'id':img_id, 'is_train':self.istrain, 'low_res':low_res} if self.super_res else \
+                 {'condi_img':condi.to(self.device), 'id':img_id, 'is_train':self.istrain}
         return (input_img.to(self.device), kwargs)

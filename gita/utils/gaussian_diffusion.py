@@ -5,6 +5,7 @@ https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0
 Docstrings have been added, as well as DDIM sampling and a new collection of beta schedules.
 """
 
+from ast import Continue
 import enum
 import math
 
@@ -789,7 +790,7 @@ class GaussianDiffusion:
         output = th.where((t == 0), decoder_nll, kl)
         return {"output": output, "pred_xstart": out["pred_xstart"]}
 
-    def training_losses(self, model, x_start, t, model_kwargs=None, noise=None):
+    def training_losses(self, model, x_start, t, s, model_kwargs=None, noise=None):
         """
         Compute training losses for a single timestep.
 
@@ -826,7 +827,20 @@ class GaussianDiffusion:
                 terms["loss"] *= self.num_timesteps
         elif self.loss_type == LossType.MSE or self.loss_type == LossType.RESCALED_MSE:
             # logger.log('model forwarding')
-            model_output = model(x_t, self._scale_timesteps(t), **model_kwargs)
+            if model_kwargs['is_train'][0]:
+                # forwarding model with noise augmented images
+                new_kwargs = {}
+                for key in model_kwargs.keys():
+                    if key in ['condi_img', 'low_res']:
+                        z_s = self.q_sample(model_kwargs[key], s)
+                        z_s.to(model.device)
+                        new_kwargs[key] = z_s
+                    else:
+                        new_kwargs[key] = model_kwargs[key]
+            else:
+                new_kwargs = model_kwargs
+
+            model_output = model(x_t, self._scale_timesteps(t), **new_kwargs)
             # logger.log('model forward completed')
             # logger.log(f'model var type: {self.model_var_type}')
             
