@@ -214,11 +214,13 @@ class TrainLoop:
     def forward_backward(self, batch, cond):
         self._zero_grad()
         t, weights = self.schedule_sampler.sample(batch.shape[0], self.device)
+        s, weights = self.schedule_sampler.sample(batch.shape[0], self.device)
         compute_losses = functools.partial(
                 self.diffusion.training_losses,
                 self.model,
                 batch,
                 t,
+                s=s,
                 model_kwargs=cond,
             )
         # logger.log("batch loss caclulating...")
