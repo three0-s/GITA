@@ -25,7 +25,7 @@ def create_argparser():
         lr=4e-5,
         weight_decay=1e-4,
         lr_anneal_steps=0,
-        batch_size=24,
+        batch_size=40,
         microbatch=-1,  # -1 disables microbatches
         ema_rate="0.9999",  # comma-separated list of EMA values
         log_interval=10,
@@ -55,16 +55,17 @@ def main():
                 encoding_dim=img_encoder.output_dim, 
                 seed=928,
                 aug_level=0.3,
-                image_size=64, 
+                image_size=256, 
+                batch_size=8,
                 num_channels=128, 
                 save_interval=2000,
-                super_res=False, # if True, need do provide the low resolutional images
+                super_res=True, # if True, need do provide the low resolutional images
                 # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-11-16-19-11-842728/model012000.pt',
                 low_res_size=64,
                 )
     if args['super_res']:
         args.update(image_size=256,
-                    num_channels=96,
+                    num_channels=64,
                     num_res_blocks=2,
                     noise_schedule="linear",
                     low_res_size=64,)
