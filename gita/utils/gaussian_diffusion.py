@@ -294,7 +294,6 @@ class GaussianDiffusion:
         """
         if model_kwargs is None:
             model_kwargs = {}
-
         B, C = x.shape[:2]
         assert t.shape == (B,)
         model_output = model(x, self._scale_timesteps(t), **model_kwargs)
