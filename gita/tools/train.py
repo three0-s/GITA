@@ -56,6 +56,7 @@ def main():
                 encoding_dim=img_encoder.output_dim, 
                 seed=928,
                 aug_level=0.3,
+                image_size=64, 
                 num_channels=128, 
                 save_interval=2000,
                 super_res=True, # if True, need do provide the low resolutional images
@@ -64,6 +65,7 @@ def main():
                 )
     if args['super_res']:
         args.update(image_size=256,
+                    num_channels=96,
                     num_res_blocks=2,
                     noise_schedule="linear",
                     low_res_size=64,)
