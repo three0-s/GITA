@@ -22,7 +22,7 @@ def create_argparser():
     defaults = dict(
         data_dir="/home/yewon/GITA/dataset/train",
         schedule_sampler="uniform_sampler",
-        lr=4e-5,
+        lr=3e-5,
         weight_decay=1e-4,
         lr_anneal_steps=0,
         batch_size=24,
@@ -54,7 +54,7 @@ def main():
     args.update(img_encoder=img_encoder, 
                 encoding_dim=img_encoder.output_dim, 
                 seed=928,
-                aug_level=0.3,
+                aug_level=0.07,
                 image_size=64, 
                 num_channels=128, 
                 save_interval=2000,
@@ -64,7 +64,7 @@ def main():
                 )
     if args['super_res']:
         args.update(image_size=256,
-                    num_channels=96,
+                    num_channels=64,
                     num_res_blocks=2,
                     noise_schedule="linear",
                     low_res_size=64,)
