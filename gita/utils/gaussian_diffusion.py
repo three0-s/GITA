@@ -299,7 +299,7 @@ class GaussianDiffusion:
         for key in model_kwargs.keys():
             if key in ['low_res']:
                 z_s = self.q_sample(model_kwargs[key], s)
-                z_s.to(model.device)
+                z_s.to(x)
                 new_kwargs[key] = z_s
             else:
                 new_kwargs[key] = model_kwargs[key]
