@@ -5,6 +5,7 @@ https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0
 Docstrings have been added, as well as DDIM sampling and a new collection of beta schedules.
 """
 
+from ast import Continue
 import enum
 import math
 
@@ -269,7 +270,7 @@ class GaussianDiffusion:
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def p_mean_variance(
-        self, model, x, t, clip_denoised=True, denoised_fn=None, model_kwargs=None
+        self, model, x, t, s, clip_denoised=True, denoised_fn=None, model_kwargs=None
     ):
         """
         Apply the model to get p(x_{t-1} | x_t), as well as a prediction of
@@ -293,10 +294,18 @@ class GaussianDiffusion:
         """
         if model_kwargs is None:
             model_kwargs = {}
-
+        # forwarding model with noise augmented images
+        new_kwargs = {}
+        for key in model_kwargs.keys():
+            if key in ['low_res']:
+                z_s = self.q_sample(model_kwargs[key], s)
+                z_s.to(model.device)
+                new_kwargs[key] = z_s
+            else:
+                new_kwargs[key] = model_kwargs[key]
         B, C = x.shape[:2]
         assert t.shape == (B,)
-        model_output = model(x, self._scale_timesteps(t), **model_kwargs)
+        model_output = model(x, self._scale_timesteps(t), **new_kwargs)
 
         if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
             assert model_output.shape == (B, C * 2, *x.shape[2:])
@@ -587,6 +596,7 @@ class GaussianDiffusion:
         model,
         x,
         t,
+        s,
         clip_denoised=True,
         denoised_fn=None,
         cond_fn=None,
@@ -602,6 +612,7 @@ class GaussianDiffusion:
             model,
             x,
             t,
+            s,
             clip_denoised=clip_denoised,
             denoised_fn=denoised_fn,
             model_kwargs=model_kwargs,
@@ -674,6 +685,7 @@ class GaussianDiffusion:
         self,
         model,
         shape,
+        s,
         noise=None,
         clip_denoised=True,
         denoised_fn=None,
@@ -692,6 +704,7 @@ class GaussianDiffusion:
         for sample in self.ddim_sample_loop_progressive(
             model,
             shape,
+            s=s,
             noise=noise,
             clip_denoised=clip_denoised,
             denoised_fn=denoised_fn,
@@ -708,6 +721,7 @@ class GaussianDiffusion:
         self,
         model,
         shape,
+        s,
         noise=None,
         clip_denoised=True,
         denoised_fn=None,
@@ -740,11 +754,13 @@ class GaussianDiffusion:
 
         for i in indices:
             t = th.tensor([i] * shape[0], device=device)
+            s = th.tensor([s] * shape[0], device=device)
             with th.no_grad():
                 out = self.ddim_sample(
                     model,
                     img,
                     t,
+                    s,
                     clip_denoised=clip_denoised,
                     denoised_fn=denoised_fn,
                     cond_fn=cond_fn,
@@ -789,7 +805,7 @@ class GaussianDiffusion:
         output = th.where((t == 0), decoder_nll, kl)
         return {"output": output, "pred_xstart": out["pred_xstart"]}
 
-    def training_losses(self, model, x_start, t, model_kwargs=None, noise=None):
+    def training_losses(self, model, x_start, t, s, model_kwargs=None, noise=None):
         """
         Compute training losses for a single timestep.
 
@@ -826,7 +842,18 @@ class GaussianDiffusion:
                 terms["loss"] *= self.num_timesteps
         elif self.loss_type == LossType.MSE or self.loss_type == LossType.RESCALED_MSE:
             # logger.log('model forwarding')
-            model_output = model(x_t, self._scale_timesteps(t), **model_kwargs)
+            
+            # forwarding model with noise augmented images
+            new_kwargs = {}
+            for key in model_kwargs.keys():
+                if key in ['low_res']:
+                    z_s = self.q_sample(model_kwargs[key], s)
+                    z_s.to(model.device)
+                    new_kwargs[key] = z_s
+                else:
+                    new_kwargs[key] = model_kwargs[key]
+
+            model_output = model(x_t, self._scale_timesteps(t), **new_kwargs)
             # logger.log('model forward completed')
             # logger.log(f'model var type: {self.model_var_type}')
             
@@ -837,7 +864,6 @@ class GaussianDiffusion:
                 B, C = x_t.shape[:2]
                 assert model_output.shape == (B, C * 2, *x_t.shape[2:])
                 model_output, model_var_values = th.split(model_output, C, dim=1)
-                # logger.log(f'model_mean shape: {model_output.shape}\nmodel_var shape: {model_var_values.shape}')
                 # Learn the variance using the variational bound, but don't let
                 # it affect our mean prediction.
                 frozen_out = th.cat([model_output.detach(), model_var_values], dim=1)
