@@ -55,7 +55,7 @@ def main():
     args.update(img_encoder=img_encoder, 
                 encoding_dim=img_encoder.output_dim, 
                 seed=928,
-                aug_level=0.3,
+                aug_level=0.07,
                 image_size=64, 
                 num_channels=128, 
                 save_interval=2000,
@@ -97,20 +97,36 @@ def train(index, flags, model, **kwargs):
                                    super_res=flags['super_res'],
                                    low_res_size=flags['low_res_size'],
                                    )
+    validation_dataset = PairedTeethImageData(img_dir=flags['data_dir'].replace('train', 'val'),
+                                   istrain=False, 
+                                   condi_aug_level=flags['aug_level'],
+                                   super_res=flags['super_res'],
+                                   low_res_size=flags['low_res_size'],
+                                   )
+
     train_sampler = torch.utils.data.distributed.DistributedSampler(
                     dataset,
                     num_replicas=xm.xrt_world_size(),
                     rank=xm.get_ordinal(),
                     shuffle=True)
+    valid_sampler = torch.utils.data.distributed.DistributedSampler(
+                    validation_dataset,
+                    num_replicas=xm.xrt_world_size(),
+                    rank=xm.get_ordinal(),
+                    shuffle=True)
+
     loader = DataLoader(dataset, batch_size=flags['batch_size'], 
                         sampler=train_sampler, num_workers=flags['num_cores'],
+                        drop_last=True)
+    val_loader = DataLoader(validation_dataset, batch_size=flags['batch_size'], 
+                        sampler=valid_sampler, num_workers=flags['num_cores'],
                         drop_last=True)
     if xm.is_master_ordinal():
         logger.log('='*8+' Creating Trainer... '.center(34)+'='*8)
     
     model.to(device)
     
-    trainer = TrainLoop(**flags, model=model, data=loader, device=device, index=index)
+    trainer = TrainLoop(**flags, model=model, data=loader, val_data=val_loader, device=device, index=index)
     if xm.is_master_ordinal():
         logger.log('='*8+' Created Trainer ! '.center(34)+'='*8)
     trainer.run_loop()

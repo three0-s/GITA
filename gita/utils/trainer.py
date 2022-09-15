@@ -38,6 +38,7 @@ class TrainLoop:
         model,
         diffusion,
         data,
+        val_data,
         batch_size,
         microbatch,
         lr,
@@ -58,6 +59,7 @@ class TrainLoop:
         self.diffusion = diffusion
         self.device = device
         self.data = data
+        self.val_data = val_data
         self.batch_size = batch_size
         self.p_uncond=p_uncond
         self.microbatch = microbatch if microbatch > 0 else batch_size
@@ -139,11 +141,36 @@ class TrainLoop:
 
     def run_loop(self):
         self.model.to(self.device)
+        if xm.is_master_ordinal():
+            with open(os.path.join(logger.Logger.CURRENT.dir, 'val_loss.csv'), 'a') as f:
+                f.write('Val Loss')
+                f.write(',')
+                f.write('Timesteps')
+                f.write('\n')
+
         while (
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps 
         ):  
             para_loader = pl.ParallelLoader(self.data, [self.device]).per_device_loader(self.device)
+            val_loader = pl.ParallelLoader(self.val_data, [self.device]).per_device_loader(self.device)
+            
+            losses = []
+            if xm.is_master_ordinal():
+                logger.log(f'Validation starts...')
+            for val_batch, cond in val_loader:
+                losses.append(self._forward_val(val_batch, cond))
+            # losses = th.concat(losses, dim=0)
+            losses = th.tensor(losses)
+            loss = losses.mean().cpu().item()
+            with open(os.path.join(logger.Logger.CURRENT.dir, 'val_loss.csv'), 'a') as f:
+                f.write(str(loss))
+                f.write(',')
+                f.write(str(self.step))
+                f.write('\n')
+
+            logger.log(f'val loss: {loss}')
+            
             for batch, cond in para_loader:
                 if xm.is_master_ordinal():
                     logger.log(f'step: {self.step + self.resume_step} starting...')
@@ -157,7 +184,8 @@ class TrainLoop:
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
                 self.step += 1
-            # xm.rendezvous('init')
+            
+            
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0 and xm.is_master_ordinal():
             logger.log(f'Saving {self.step + self.resume_step} step checkpoint...')
@@ -276,6 +304,28 @@ class TrainLoop:
             logger.log("batch loss backward completed !")
         '''
     
+
+    def _forward_val(self, batch, cond):
+        with th.no_grad():
+            self._zero_grad()
+            t, weights = self.schedule_sampler.sample(batch.shape[0], self.device)
+            s, weights = self.schedule_sampler.sample(batch.shape[0], self.device)
+            compute_losses = functools.partial(
+                    self.diffusion.training_losses,
+                    self.model,
+                    batch,
+                    t,
+                    s=s,
+                    model_kwargs=cond,
+                )
+            
+            # logger.log("batch loss caclulating...")
+            losses = compute_losses()
+            loss = (losses["loss"] * weights).mean()
+            # logger.log("batch loss caclulated...")
+            # logger.log("batch loss backward...")
+            self.opt.zero_grad()
+            return loss
     # def _update_ema(self):
     #     for rate, params in zip(self.ema_rate, self.ema_params):
     #         update_ema(params, self.model.parameters(), rate=rate)
