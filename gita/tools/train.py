@@ -57,15 +57,16 @@ def main():
                 seed=928,
                 aug_level=0.07,
                 image_size=64, 
+                batch_size=8,
                 num_channels=128, 
                 save_interval=2000,
                 super_res=True, # if True, need do provide the low resolutional images
-                # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-11-16-19-11-842728/model012000.pt',
+                resume_checkpoint='/home/yewon/gita-log/gita-2022-09-15-15-56-21-899935/model002000.pt',
                 low_res_size=64,
                 )
     if args['super_res']:
         args.update(image_size=256,
-                    num_channels=96,
+                    num_channels=64,
                     num_res_blocks=2,
                     noise_schedule="linear",
                     low_res_size=64,)
@@ -96,12 +97,14 @@ def train(index, flags, model, **kwargs):
                                    condi_aug_level=flags['aug_level'],
                                    super_res=flags['super_res'],
                                    low_res_size=flags['low_res_size'],
+                                   img_size=flags['image_size']
                                    )
     validation_dataset = PairedTeethImageData(img_dir=flags['data_dir'].replace('train', 'val'),
                                    istrain=False, 
                                    condi_aug_level=flags['aug_level'],
                                    super_res=flags['super_res'],
                                    low_res_size=flags['low_res_size'],
+                                   img_size=flags['image_size']
                                    )
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(

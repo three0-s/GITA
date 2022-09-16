@@ -196,10 +196,11 @@ class TrainLoop:
     def run_step(self, batch, cond):
         # classifier-free guidance training
         cond_ = cond
-        if th.rand(1) <= self.p_uncond:
-            if xm.is_master_ordinal():
-                logger.log(f'Randomly masking the condition image for unconditional image generation...')
-            cond_['condi_img'] = th.zeros_like(cond['condi_img']).to(cond['condi_img'])
+        if 'low_res' not in cond.keys():
+            if th.rand(1) <= self.p_uncond:
+                if xm.is_master_ordinal():
+                    logger.log(f'Randomly masking the condition image for unconditional image generation...')
+                cond_['condi_img'] = th.zeros_like(cond['condi_img']).to(cond['condi_img'])
 
         self.forward_backward(batch, cond_)
         took_step = self.optimize(self.opt)
