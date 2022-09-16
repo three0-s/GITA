@@ -61,7 +61,7 @@ def main():
                 num_channels=128, 
                 save_interval=2000,
                 super_res=True, # if True, need do provide the low resolutional images
-                resume_checkpoint='/home/yewon/gita-log/gita-2022-09-15-15-56-21-899935/model002000.pt',
+                # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-15-15-56-21-899935/model002000.pt',
                 low_res_size=64,
                 )
     if args['super_res']:

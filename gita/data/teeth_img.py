@@ -61,9 +61,6 @@ class PairedTeethImageData(Dataset):
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
         if super_res:
             self.noise_aug = Compose([Resize((int(self.low_res_size),int(self.low_res_size)), interpolation=BICUBIC), 
-                                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
-                                    GaussianNoise(self.condi_aug_level),]) if self.istrain else \
-                             Compose([Resize((int(self.low_res_size),int(self.low_res_size)),interpolation=BICUBIC), 
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
                              
     def __len__(self):
