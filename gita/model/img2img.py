@@ -15,11 +15,14 @@ class GITA(UNetModel):
             for param in self.img_encoder.parameters():
                 param.requires_grad = False
             self.img_encoder.to(self.device)
+            self.encoding_dim = encoding_dim
+            self.embed_linear_transform = nn.Linear(self.encoding_dim, self.model_channels*4, device=self.device, dtype=self.dtype)
+            self.device = list(img_encoder.modules())[1].weight.data.device
+            self.dtype = list(img_encoder.modules())[1].weight.data.dtype
+        else:
+            self.device=th.device('cpu')
+            self.dtype=th.float32
         
-        self.encoding_dim = encoding_dim
-        self.device = list(img_encoder.modules())[1].weight.data.device
-        self.dtype = list(img_encoder.modules())[1].weight.data.dtype
-        self.embed_linear_transform = nn.Linear(self.encoding_dim, self.model_channels*4, device=self.device, dtype=self.dtype)
         # self.cache = None  # We need to cache encoding (or embedding) of condition image to reduce FLOPS.
         self.to(self.device)
         
@@ -69,7 +72,7 @@ class SuperResGITA(GITA):
             # Curse you, Python. Or really, just curse positional arguments :|.
             args = list(args)
             args[1] = args[1] * 2
-        super().__init__(img_encoder=None, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def forward(self, x, timesteps, condi_img=None, low_res=None, **kwargs):
         _, _, new_height, new_width = x.shape

@@ -70,9 +70,10 @@ def create_model(
         assert 2 ** (len(channel_mult) + 2) == image_size
 
     attention_ds = []
-    for res in attention_resolutions.split(","):
-        attention_ds.append(image_size // int(res))
-    
+    if attention_resolutions != "":
+        for res in attention_resolutions.split(","):
+            attention_ds.append(image_size // int(res))
+            
     # Only supports image to image translation and Upsampling
     model_cls = GITA if not super_res else  SuperResGITA
     return model_cls(

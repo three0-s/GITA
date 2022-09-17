@@ -43,24 +43,27 @@ def create_argparser():
 
 def main():
     args = create_argparser()#.parse_args()
-    args.update(clip_model_name='ViT-B/16',)
+    args.update(clip_model_name='ViT-B/16',
+                super_res=True,) # if True, need do provide the low resolutional images)
     logger.configure()
     
-    logger.log('='*8+' Creating Clip Encoder... '.center(34)+'='*8)
-    clip_model, preprocess = clip.load(args['clip_model_name'])
-    img_encoder = clip_model.visual
-    logger.log('='*8+' Completed ! '.center(34)+'='*8)
+    if not args['super_res']:
+        logger.log('='*8+' Creating Clip Encoder... '.center(34)+'='*8)
+        clip_model, preprocess = clip.load(args['clip_model_name'])
+        img_encoder = clip_model.visual
+        logger.log('='*8+' Completed ! '.center(34)+'='*8)
+    else:
+        img_encoder=None
     # model_kwargs = args_to_dict(args, model_and_diffusion_defaults().keys())
 
     args.update(img_encoder=img_encoder, 
-                encoding_dim=img_encoder.output_dim, 
+                encoding_dim=img_encoder.output_dim if img_encoder != None else 0, 
                 seed=928,
                 aug_level=0.3,
                 image_size=64, 
                 batch_size=8,
                 num_channels=128, 
-                save_interval=2000,
-                super_res=True, # if True, need do provide the low resolutional images
+                save_interval=1000,
                 # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-15-15-56-21-899935/model002000.pt',
                 low_res_size=64,
                 )
@@ -69,6 +72,7 @@ def main():
                     num_channels=64,
                     num_res_blocks=2,
                     noise_schedule="linear",
+                    attention_resolutions="",
                     low_res_size=64,)
 
     logger.log('='*8+' Creating diffusion model... '.center(34)+'='*8)
