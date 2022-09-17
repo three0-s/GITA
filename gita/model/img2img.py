@@ -14,11 +14,13 @@ class GITA(UNetModel):
         if img_encoder != None:
             for param in self.img_encoder.parameters():
                 param.requires_grad = False
-            self.img_encoder.to(self.device)
+            
             self.encoding_dim = encoding_dim
-            self.embed_linear_transform = nn.Linear(self.encoding_dim, self.model_channels*4, device=self.device, dtype=self.dtype)
             self.device = list(img_encoder.modules())[1].weight.data.device
             self.dtype = list(img_encoder.modules())[1].weight.data.dtype
+            self.embed_linear_transform = nn.Linear(self.encoding_dim, self.model_channels*4, device=self.device, dtype=self.dtype)
+            
+            self.img_encoder.to(self.device)
         else:
             self.device=th.device('cpu')
             self.dtype=th.float32

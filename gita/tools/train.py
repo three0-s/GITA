@@ -44,7 +44,7 @@ def create_argparser():
 def main():
     args = create_argparser()#.parse_args()
     args.update(clip_model_name='ViT-B/16',
-                super_res=True,) # if True, need do provide the low resolutional images)
+                super_res=False,) # if True, need do provide the low resolutional images)
     logger.configure()
     
     if not args['super_res']:
@@ -59,7 +59,7 @@ def main():
     args.update(img_encoder=img_encoder, 
                 encoding_dim=img_encoder.output_dim if img_encoder != None else 0, 
                 seed=928,
-                aug_level=0.3,
+                aug_level=0.6,
                 image_size=64, 
                 batch_size=8,
                 num_channels=128, 
