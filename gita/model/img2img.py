@@ -11,15 +11,16 @@ class GITA(UNetModel):
     def __init__(self, img_encoder, encoding_dim=512, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.img_encoder = img_encoder
-        for param in self.img_encoder.parameters():
-            param.requires_grad = False
-
+        if img_encoder != None:
+            for param in self.img_encoder.parameters():
+                param.requires_grad = False
+            self.img_encoder.to(self.device)
+        
         self.encoding_dim = encoding_dim
         self.device = list(img_encoder.modules())[1].weight.data.device
         self.dtype = list(img_encoder.modules())[1].weight.data.dtype
         self.embed_linear_transform = nn.Linear(self.encoding_dim, self.model_channels*4, device=self.device, dtype=self.dtype)
         # self.cache = None  # We need to cache encoding (or embedding) of condition image to reduce FLOPS.
-        self.img_encoder.to(self.device)
         self.to(self.device)
         
     # # Motivated by GLIDE (https://github.com/openai/glide-text2im/blob/69b530740eb6cef69442d6180579ef5ba9ef063e/glide_text2im/text2im_model.py#L120)
@@ -68,10 +69,10 @@ class SuperResGITA(GITA):
             # Curse you, Python. Or really, just curse positional arguments :|.
             args = list(args)
             args[1] = args[1] * 2
-        super().__init__(*args, **kwargs)
+        super().__init__(img_encoder=None, *args, **kwargs)
 
     def forward(self, x, timesteps, condi_img=None, low_res=None, **kwargs):
         _, _, new_height, new_width = x.shape
         upsampled = F.interpolate(low_res, (new_height, new_width), mode="bilinear")
         x = th.cat([x, upsampled], dim=1)
-        return super().forward(x, timesteps, condi_img=condi_img, **kwargs)
+        return super().forward(x, timesteps, condi_img=None, **kwargs)

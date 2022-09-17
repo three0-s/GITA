@@ -55,7 +55,7 @@ def main():
     args.update(img_encoder=img_encoder, 
                 encoding_dim=img_encoder.output_dim, 
                 seed=928,
-                aug_level=0.07,
+                aug_level=0.3,
                 image_size=64, 
                 batch_size=8,
                 num_channels=128, 
