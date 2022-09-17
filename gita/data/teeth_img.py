@@ -44,8 +44,7 @@ class PairedTeethImageData(Dataset):
         self.condi_aug_level = condi_aug_level
         self.super_res = super_res
         # 220912 Augmentation confirmed
-        self.img_resizer = Compose([Resize((int(self.img_size*1.1),int(self.img_size*1.1)), interpolation=BICUBIC), 
-                                    ColorJitter(brightness=0.1, contrast=0.1),
+        self.img_resizer = Compose([Resize((int(self.img_size*1.13),int(self.img_size*1.13)), interpolation=BICUBIC), 
                                     RandomCrop(self.img_size),
                                     Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])if self.istrain else \
                            Compose([Resize((int(self.img_size),int(self.img_size)),interpolation=BICUBIC), 
