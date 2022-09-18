@@ -59,11 +59,11 @@ def main():
     args.update(img_encoder=img_encoder, 
                 encoding_dim=img_encoder.output_dim if img_encoder != None else 0, 
                 seed=928,
-                aug_level=0.6,
+                aug_level=0.5,
                 image_size=64, 
                 batch_size=8,
                 num_channels=128, 
-                save_interval=1000,
+                save_interval=1500,
                 # resume_checkpoint='/home/yewon/gita-log/gita-2022-09-15-15-56-21-899935/model002000.pt',
                 low_res_size=64,
                 )

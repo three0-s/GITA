@@ -79,7 +79,7 @@ def main():
                 clip_model_name='ViT-B/16',
                 out_dir='/home/yewon/gita-log/base_results/',
                 use_dynamic_thr=True,
-                resume_checkpoint='/home/yewon/gita-log/gita-2022-09-15-15-12-58-613642/model010000.pt',
+                resume_checkpoint='/home/yewon/gita-log/gita-2022-09-17-09-28-56-422351/model025500.pt',
                 guidance_scale = 2.0,)
     mode = 'dynamic' if args['use_dynamic_thr'] else 'static'
     model_ver = args['resume_checkpoint'].split('/')[-1].split('.')[0]
